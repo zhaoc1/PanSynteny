@@ -1,0 +1,47 @@
+job:
+  species_id:    "xx"
+  trait:         "xx"
+  proj_dir:      "/path/to/output-dir"
+
+data:
+  midas_dir:     "/path/to/midas-output"
+  midasdb_dir:   "/path/to/midas-output"
+  df_dir:        "/path/to/defencefinder"
+  data_dir:      "/path/to/data-dir"
+
+prepare:                        # specific for MWAS 
+  score_col:        cor_to_b    # column in corrected_genes used to score genes; one of {cor_to_b, beta}
+  inclusion_cutoff: 0.25        # min |score_col| for any gene to be retained in focal_c80_df
+  focal_cutoff:     0.5         # min |score_col| for a gene to be marked is_focal = TRUE
+
+neighbor:
+  focal_min_genomes:        10  # min genomes a Step 1 neighborhood pattern must appear in to survive
+  focal_min_total_genomes:  30  # min total genomes a focal must be present in
+  min_positions:            5   # min surviving relative positions per focal in compute_relative_positions
+  upper_bound:              10
+  min_left_neighbors:       2
+  min_right_neighbors:      2
+  use_strict:               ~
+  min_group_proportion:     0.05 # min per-group genome proportion to retain a Step 1 neighborhood pattern
+  coverage_warn_threshold:  0.8  # warn if surviving Step 1 groups cover less than this fraction of total
+
+path:
+  path_min_genomes:         20   # min strains a canonical operon must be backed by (Step 3 gate)
+  truncation_cutoff:        0.8  # length / centroid_length below which a gene counts as truncated (Step 3)
+
+blocks:
+  allow_gaps: 2                # max non-hit positions allowed inside one block (aggregate_blocks)
+  min_overlap: 1               # min LCS length to call two blocks "overlap" (rank_block_representatives)
+  min_shared:  2               # diagnostic threshold for substring-overlap pairs (diagnose_rep_overlaps)
+
+parse:
+  seed: 616                    # RNG seed for the per-fine-isoform exemplar genome draw (Step 5)
+  fine_coverage_ratio: 0.25    # n_fine_genomes >= ceiling(path_min_genomes * ratio) to survive (Step 5)
+  fill_modes:                  # one PDF per mode; subset of beta / sample_prevalence / cor_to_b / fill_gene (Step 6)
+    - beta
+    - sample_prevalence
+    - cor_to_b
+    - fill_gene
+
+plot:
+  gene_padding_bp: 100         # bp gap between genes in Step 1 + Step 6 gggenes layouts

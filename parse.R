@@ -1,8 +1,8 @@
 # ------------------------------------------------------------------------------
 # parse.R
 #
-# Step 5 orchestrator + reusable post-processing helpers for the Step 3
-# canonical-paths outputs. `run_step5_parse` is the entry point called by
+# Step 4 orchestrator + reusable post-processing helpers for the Step 3
+# canonical-paths outputs. `run_step4_parse` is the entry point called by
 # pipeline.R; the individual helpers below are also safe to call standalone
 # on Step 3 outputs (canonical_paths_c80s, canonical_paths_fine_c80s,
 # canonical_paths_per_genome) for ad-hoc analysis.
@@ -21,17 +21,17 @@
 #                                       centroid_80) onto fine_long.
 #   write_blast_gene_lists          —  per-(uid_fine, neighbor_genome) gene-id TSVs for BLAST.
 #   assign_c80_label                —  per-row pos/neg/neu/anchor label from a trait stat;
-#                                       used by decorate_with_updated_path_type and the Step 6 plotters.
+#                                       used by decorate_with_updated_path_type and the Step 5 plotters.
 #   decorate_with_updated_path_type —  per-(component, canonical_path, path_type) summary;
 #                                       adds c80_label_combo, purity_status, updated_path_type
 #                                       (anchor_pos / anchor_neg / anchor_mixed). Facet variable
-#                                       for the Step 6 per-component plotters.
-#   run_step5_parse                 —  Step 5 orchestrator: builds summaries + selection sets,
+#                                       for the Step 5 per-component plotters.
+#   run_step4_parse                 —  Step 4 orchestrator: builds summaries + selection sets,
 #                                       samples one exemplar genome per surviving fine isoform,
 #                                       writes five TSVs and the BLAST gene-id directory.
 #
-# Step 6 gggenes plotters (`plot_coarse/fine_operons`, `plot_*_by_component`,
-# `run_step6_figures`) and their layout/scale helpers live in plot.R.
+# Step 5 gggenes plotters (`plot_coarse/fine_operons`, `plot_*_by_component`,
+# `run_step5_figures`) and their layout/scale helpers live in plot.R.
 #
 # Author:   Chunyu Zhao <chunyu.zhao@gladstone.ucsf.edu>
 # Created:  2026-04-24
@@ -66,8 +66,8 @@ library(stringr)
 #'   rows of a given `uid` / `uid_fine`).
 #' * **`n_focal`** — per-operon count of focal rows (`is_focal == TRUE`)
 #'   within `group_key`, broadcast to every row of that operon. NA values
-#'   in `is_focal` are coalesced to FALSE so non-`gene_meta` rows
-#'   (short ORFs, neighbors absent from `gene_meta`) correctly count as
+#'   in `is_focal` are coalesced to FALSE so non-`focal_meta` rows
+#'   (short ORFs, neighbors absent from `focal_meta`) correctly count as
 #'   non-focal.
 #' * **`dist_to_smallORFs`** — for focal rows (`is_focal == TRUE`), the
 #'   smallest positional distance within `group_key` to a small-ORF row
@@ -85,11 +85,11 @@ library(stringr)
 #' explicitly *not* used here. Pass `group_key = "uid"` for coarse,
 #' `"uid_fine"` for fine.
 #'
-#' The focal flag column is hardcoded to `is_focal` (added to `gene_meta`
+#' The focal flag column is hardcoded to `is_focal` (added to `focal_meta`
 #' by the driver). NA values are coalesced to FALSE.
 #'
 #' For how `neighbor_c80_coarse`, `neighbor_c80_fine`, and `centroid_80` differ
-#' and when to use each, see `PIPELINE.md`.
+#' and when to use each, see `docs/PIPELINE.md`.
 #'
 #' @export
 decorate_c80s_w_smallORFs <- function(df, group_key = "uid") {
@@ -329,7 +329,6 @@ summarize_fine_isoforms <- function(canonical_paths_fine_c80s) {
       fine_path_string  = paste(neighbor_c80_fine, collapse = " → "),
       .groups = "drop"
     ) %>%
-    #mutate(dominant_fraction = n_fine_genomes / n_genomes) %>%
     arrange(desc(n_fine_genomes)) %>%
     relocate(fine_neighbor_genomes, .after = last_col())
 }
@@ -513,12 +512,12 @@ write_blast_gene_lists <- function(sampled_long, out_dir) {
 
 
 # -----------------------------------------------------------------------------
-# Plot data-prep helpers (used by the Step 6 plotters in plot.R)
+# Plot data-prep helpers (used by the Step 5 plotters in plot.R)
 # -----------------------------------------------------------------------------
 
 #' Label c80 rows by focal-direction or anchor role
 #'
-#' Adds a `c80_label` column to a c80s frame for use by the Step 6
+#' Adds a `c80_label` column to a c80s frame for use by the Step 5
 #' plotters in `plot.R`. Focal-aware: only focal rows (`is_focal == TRUE`)
 #' get direction labels; non-focal rows on anchor canonical paths get the
 #' `"anchor"` label so they show up as the per-path frame of reference.
@@ -533,7 +532,7 @@ write_blast_gene_lists <- function(sampled_long, out_dir) {
 #' * `NA`: everything else (non-focal rows on non-anchor paths; focal
 #'   rows with `NA` `value_col`).
 #'
-#' Step 6 glyph mapping (`.layout_operon_tracks` in plot.R): `pos` -> `"U"`,
+#' Step 5 glyph mapping (`.layout_operon_tracks` in plot.R): `pos` -> `"U"`,
 #' `neg` -> `"D"`, `neu` -> `"N"`, `anchor` -> `"O"`. Coloring (`fill_gene`)
 #' is applied to `pos`/`neg`/`anchor` rows; `neu` carries the glyph but no
 #' fill.
@@ -541,10 +540,18 @@ write_blast_gene_lists <- function(sampled_long, out_dir) {
 #' @param df A c80s frame; must contain `is_focal`, `path_type`, and
 #'   the column named by `value_col`.
 #' @param value_col Name of the trait-association column to read sign
-#'   from (default `"cor_to_b"`; Step 5 passes `"beta"`).
+#'   from (default `"cor_to_b"`; Step 4 passes `"beta"`).
 #'
 #' @export
 assign_c80_label <- function(df, value_col = "cor_to_b") {
+  # No trait score — use focal_label directly if available
+  if (!value_col %in% names(df)) {
+    if ("focal_label" %in% names(df)) {
+      return(df %>% mutate(c80_label = if_else(coalesce(is_focal, FALSE), focal_label, NA_character_)))
+    }
+    return(df %>% mutate(c80_label = NA_character_))
+  }
+
   stopifnot(all(c("is_focal", "path_type", value_col) %in% names(df)))
 
   df %>%
@@ -589,17 +596,15 @@ decorate_with_updated_path_type <- function(df) {
       .groups = "drop"
     ) %>%
     mutate(
-      .pos = str_detect(c80_label_combo, "\\bpos\\b"),
-      .neg = str_detect(c80_label_combo, "\\bneg\\b"),
-      purity_status = if_else(.pos & .neg, "impure", "pure"),
+      .n_labels = str_count(c80_label_combo, ",") + 1L,
+      purity_status = if_else(.n_labels > 1L, "impure", "pure"),
       updated_path_type = case_when(
-        path_type == "anchor" &  .pos & !.neg ~ "anchor_pos",
-        path_type == "anchor" & !.pos &  .neg ~ "anchor_neg",
-        path_type == "anchor" &  .pos &  .neg ~ "anchor_mixed",
-        TRUE                                  ~ path_type
+        path_type == "anchor" & purity_status == "impure" ~ paste0("anchor_mixed"),
+        path_type == "anchor" & purity_status == "pure"   ~ paste0("anchor_", c80_label_combo),
+        TRUE                                              ~ path_type
       )
     ) %>%
-    select(-.pos, -.neg)
+    select(-.n_labels)
 
   df %>%
     left_join(per_path, by = c("joint_component_id", "canonical_path_id", "path_type")) %>%
@@ -610,9 +615,9 @@ decorate_with_updated_path_type <- function(df) {
 }
 
 
-#' Run Step 5: summaries, fine-coverage selection, exemplar sampling, BLAST gene lists
+#' Run Step 4: summaries, fine-coverage selection, exemplar sampling, BLAST gene lists
 #'
-#' Orchestrator for Step 5. Builds per-operon and per-isoform summaries,
+#' Orchestrator for Step 4. Builds per-operon and per-isoform summaries,
 #' applies the fine-coverage isoform-survival filter, attaches
 #' isoform-map columns to `coarse_summary`, samples one exemplar genome
 #' per surviving fine isoform, enriches the long-format result with
@@ -620,11 +625,11 @@ decorate_with_updated_path_type <- function(df) {
 #' gene-id TSVs for the external BLAST workflow.
 #'
 #' Inputs are passed in explicitly so the caller (pipeline.R) is the one
-#' place that loads the three Step 3 TSVs from disk; this keeps Step 5
+#' place that loads the three Step 3 TSVs from disk; this keeps Step 4
 #' re-runnable in isolation while making the call-site signature
-#' self-documenting. The plotting block lives in [run_step6_figures()]
+#' self-documenting. The plotting block lives in [run_step5_figures()]
 #' (plot.R) so a re-render after editing `fill_modes` does not require
-#' re-running the rest of Step 5.
+#' re-running the rest of Step 4.
 #'
 #' Reads `path_min_genomes`, `fine_coverage_ratio`, and `seed` from
 #' `job_config` via `cfg_get`. Writes five TSVs via `get_target`:
@@ -649,7 +654,7 @@ decorate_with_updated_path_type <- function(df) {
 #'   disk only.
 #'
 #' @export
-run_step5_parse <- function(c80s_coarse, c80s_fine, per_genome, gene_neighbors) {
+run_step4_parse <- function(c80s_coarse, c80s_fine, per_genome, gene_neighbors) {
   # 1. Summaries
   coarse_summary <- summarize_coarse_operons(c80s_coarse)
   fine_summary <- summarize_fine_isoforms(c80s_fine)

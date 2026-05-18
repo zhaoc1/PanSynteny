@@ -1,7 +1,8 @@
 # ------------------------------------------------------------------------------
 # blocks.R
 #
-# Step 4 of the strain-aware operon pipeline: focal block analysis.
+# Step 6 of the strain-aware operon pipeline: focal block analysis (gated by
+# blocks.skip; writes under step6_blocks/).
 #
 # Walks from per-gene trait statistics along canonical operon paths to a
 # ranked set of focal block representatives with per-genome
@@ -10,10 +11,10 @@
 #   aggregate_blocks()                — focal-block extraction + cross-path aggregation.
 #   rank_block_representatives()      — dominant-block selection + ranking.
 #   map_representatives_to_genomes()  — per-genome attribution for reps.
-#   run_step4_block_extraction()      — Step 4 orchestrator: runs all stages, writes outputs.
+#   run_step6_blocks()      — Step 6 orchestrator: runs all stages, writes outputs.
 #
 # Author:  Chunyu Zhao <chunyu.zhao@gladstone.ucsf.edu>
-# Created: 2025-10-10 (extracted from pipeline.R Step 4)
+# Created: 2025-10-10 (extracted from pipeline.R; renumbered to Step 6 on 2026-05-15)
 # ------------------------------------------------------------------------------
 
 library(dplyr)
@@ -40,7 +41,7 @@ library(purrr)
 #' rows (via `group_modify`) and are effectively dropped from the output.
 #'
 #' **NA handling.** Rows joined in from outside `focal_c80_df` (short
-#' ORFs, neighbors absent from `gene_meta`) carry `is_focal = NA`. NA is
+#' ORFs, neighbors absent from `focal_meta`) carry `is_focal = NA`. NA is
 #' coerced to FALSE, so they correctly count as non-focal.
 #'
 #' @seealso [aggregate_blocks()] for the cross-canonical aggregation
@@ -85,7 +86,7 @@ keep_focal_blocks <- function(df, allow_gaps = 2) {
 
 #' Extract focal blocks and aggregate across canonical paths
 #'
-#' Stage 1 + 2 of Step 4. Within each canonical path, find contiguous runs
+#' Stage 1 + 2 of Step 6. Within each canonical path, find contiguous runs
 #' of focal genes (`is_focal == TRUE`) via [keep_focal_blocks()], collapse
 #' each run into an ordered c80 sequence, then aggregate across canonical
 #' paths in the same `(joint_component_id, path_type)` group so equivalent
@@ -99,7 +100,7 @@ aggregate_blocks <- function(c80s_coarse, allow_gaps = 2) {
   # 2) Collapse each block into an ordered c80 sequence.
   #    `uid` is added to the group_by because it is functionally determined by
   #    (joint_component_id, path_type, canonical_path_id, n_genomes); carrying
-  #    it through lets step 4 emit a parallel `canonical_uids` list alongside
+  #    it through lets step 6 emit a parallel `canonical_uids` list alongside
   #    `canonical_paths`.
   edge_c80_per_block <- c80_blocks %>%
     group_by(joint_component_id, canonical_path_id, path_type, block_num, n_genomes, uid) %>%
@@ -150,7 +151,7 @@ aggregate_blocks <- function(c80s_coarse, allow_gaps = 2) {
 
 #' Select a reference block per component and rank everything else
 #'
-#' Stage 3 + 4 of Step 4. Within each `(joint_component_id, path_type)`
+#' Stage 3 + 4 of Step 6. Within each `(joint_component_id, path_type)`
 #' group, pick the dominant block as a reference (`selected_tbl`), then use
 #' [annotate_group()] to rank every block relative to that reference based
 #' on sequence-overlap relationships. Non-redundant blocks carry
@@ -203,7 +204,7 @@ rank_block_representatives <- function(block_agg, min_overlap = 1) {
 
 #' Attach per-genome attribution to each representative block
 #'
-#' Stage 5 of Step 4. For each representative block, walk back through the
+#' Stage 5 of Step 6. For each representative block, walk back through the
 #' Step 3 provenance chain via
 #' [explode_canonical_into_collapsed_paths()] to find the genomes that
 #' carry its contributing canonical paths, and construct a stable block
@@ -316,7 +317,7 @@ diagnose_rep_overlaps <- function(representatives, min_shared = 2) {
 #' [is_contig_subseq()] which does not test the reverse of `p`. A block
 #' and its exact mirror currently survive as two separate reps. A
 #' reverse-aware variant would also test `is_contig_subseq(rev(p), r)`;
-#' not yet wired in (see ROADMAP.md R2).
+#' not yet wired in (see parked/ROADMAP.md R2).
 #'
 #' **Superpaths are not redundant.** A block that *contains* an existing
 #' rep gets its own rank — it adds information (length-variant extension)
@@ -422,9 +423,9 @@ get_relation <- function(path, sel_path, min_overlap = 1) {
 }
 
 
-#' Run Step 4 — focal block extraction + representative ranking
+#' Run Step 6 — focal block extraction + representative ranking
 #'
-#' Orchestrator for Step 4. Mines `c80s_coarse` for runs of focal genes
+#' Orchestrator for Step 6. Mines `c80s_coarse` for runs of focal genes
 #' ("hit blocks"), aggregates equivalent runs across canonical paths,
 #' picks one dominant block per `(joint_component_id, path_type)` as
 #' reference, ranks every other block by its containment / overlap
@@ -454,7 +455,7 @@ get_relation <- function(path, sel_path, min_overlap = 1) {
 #'   `rep_overlap_diag`) are written to disk / stderr only.
 #'
 #' @export
-run_step4_block_extraction <- function(c80s_coarse, c_paths,
+run_step6_blocks <- function(c80s_coarse, c_paths,
                                        collapsed_paths, path_df) {
 
   allow_gaps <- cfg_get(job_config, "allow_gaps")
@@ -489,7 +490,7 @@ run_step4_block_extraction <- function(c80s_coarse, c_paths,
   # Optional rep_heatmap.pdf: only rendered when at least two reps
   # survive and the block-by-genome matrix is at least 3x3 (pheatmap
   # requires multiple rows/columns to cluster).
-  if (length(rep_slim$block_uid) > 1) {
+  if (n_distinct(rep_slim$block_uid) > 1) {
     fd <- dirname(get_target("uid_path_df"))
     fp <- file.path(fd, "rep_heatmap.pdf")
     d <- rep_slim %>% select(block_uid, neighbor_genome) %>% mutate(v = 1)

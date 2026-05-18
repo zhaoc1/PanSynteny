@@ -6,8 +6,8 @@
 #     `find_most_prevalent_operon_size`, `compute_selected_bins`,
 #     `find_peaks`, `get_fill_scale`): called from `parse_gene_neighbor`
 #     in neighbor.R; render the per-focal fig1-fig5 PDFs.
-#   * Step 6 operon-visualization plotters (`plot_coarse_operons`,
-#     `plot_fine_operons`, `plot_*_by_component`, `run_step6_figures`)
+#   * Step 5 operon-visualization plotters (`plot_coarse_operons`,
+#     `plot_fine_operons`, `plot_*_by_component`, `run_step5_figures`)
 #     Called from pipeline.R; render the global + per-component
 #     gggenes PDFs from the Step 3 canonical-paths outputs.
 #
@@ -215,12 +215,12 @@ saturated_rainbow <- function (n, saturation_limit=0.4) {
 }
 
 # ------------------------------------------------------------------------------
-# Operon visualization (gggenes): Step 6
+# Operon visualization (gggenes): Step 5
 #
 # Multi-fill global plotters and per-component plotters that consume the
 # canonical operon tables emitted by Step 3 (canonical_paths_c80s,
-# canonical_paths_fine_c80s) plus the Step 5 selection sets. Wired
-# together by `run_step6_figures` at the bottom of this file. Data-prep
+# canonical_paths_fine_c80s) plus the Step 4 selection sets. Wired
+# together by `run_step5_figures` at the bottom of this file. Data-prep
 # helpers (assign_c80_label, decorate_with_updated_path_type) live in
 # parse.R.
 # ------------------------------------------------------------------------------
@@ -260,14 +260,24 @@ saturated_rainbow <- function (n, saturation_limit=0.4) {
     ungroup() %>%
     mutate(
       track_label = .data[[label_col]],
-      fill_symbol = case_when(
-        coalesce(is_focal, FALSE) & !is.na(beta) & beta < 0 ~ "D",
-        coalesce(is_focal, FALSE) & !is.na(beta) & beta > 0 ~ "U",
-        !is.na(is_fragmented) & is_fragmented               ~ "F",
-        !is.na(is_truncated)  & is_truncated                ~ "T",
-        is_smallORF                                         ~ "s",
-        TRUE                                                ~ NA_character_
-      )
+      fill_symbol = if ("beta" %in% names(.)) {
+        case_when(
+          coalesce(is_focal, FALSE) & !is.na(beta) & beta < 0 ~ "D",
+          coalesce(is_focal, FALSE) & !is.na(beta) & beta > 0 ~ "U",
+          !is.na(is_fragmented) & is_fragmented               ~ "F",
+          !is.na(is_truncated)  & is_truncated                ~ "T",
+          is_smallORF                                         ~ "s",
+          TRUE                                                ~ NA_character_
+        )
+      } else {
+        case_when(
+          coalesce(is_focal, FALSE)                           ~ "*",
+          !is.na(is_fragmented) & is_fragmented               ~ "F",
+          !is.na(is_truncated)  & is_truncated                ~ "T",
+          is_smallORF                                         ~ "s",
+          TRUE                                                ~ NA_character_
+        )
+      }
     )
 
   if (annotate_smallORF_placeholder) {
@@ -309,6 +319,9 @@ saturated_rainbow <- function (n, saturation_limit=0.4) {
     "beta" = scale_fill_viridis_c(option = "D", na.value = "white", name = "beta"),
     "sample_prevalence" = scale_fill_viridis_c(option = "D", limits = c(0, 1), na.value = "white", name = "Sample prevalence"),
     "cor_to_b"  = scale_fill_viridis_c(option = "D", limits = c(-0.5, 0.5), na.value = "white", name = "cor to b"),
+    "gene_label" = scale_fill_brewer(palette = "Set2", na.value = "white", name = "Gene label"),
+    "focal_type" = scale_fill_brewer(palette = "Set1", na.value = "white", name = "Focal type"),
+    "focal_label" = scale_fill_brewer(palette = "Set1", na.value = "white", name = "Focal label"),
     "fill_gene" = {
       gene_ids <- sort(unique(pdf$fill_gene))
       n <- length(gene_ids)
@@ -353,7 +366,7 @@ saturated_rainbow <- function (n, saturation_limit=0.4) {
 
 
 .fill_modes_validate <- function(fill_by) {
-  ok <- c("beta", "sample_prevalence", "cor_to_b", "fill_gene")
+  ok <- c("beta", "sample_prevalence", "cor_to_b", "fill_gene", "gene_label", "focal_type", "focal_label")
   bad <- setdiff(fill_by, ok)
   if (length(bad)) stop("Unknown fill_by mode(s): ", paste(bad, collapse = ", "),
                         ". Allowed: ", paste(ok, collapse = ", "))
@@ -383,12 +396,12 @@ saturated_rainbow <- function (n, saturation_limit=0.4) {
 #' the PDF a manageable size.
 #'
 #' `fill_by` accepts any subset of `c("beta", "sample_prevalence",
-#' "cor_to_b", "fill_gene")`; one PDF is emitted per mode, named
-#' `coarse_operons_<fill_by>.pdf`. Default `c("beta")` matches the
-#' previous single-output behavior.
+#' "cor_to_b", "fill_gene", "gene_label", "focal_type", "focal_label")`
+#' (validated by `.fill_modes_validate`); one PDF is emitted per mode,
+#' named `coarse_operons_<fill_by>.pdf`.
 #'
 #' @export
-plot_coarse_operons <- function(coarse_summary, canonical_paths_c80s, 
+plot_coarse_operons <- function(coarse_summary, canonical_paths_c80s,
                                 out_dir, fill_by, width = 20, height_per_row = 0.3) {
   if (!nrow(coarse_summary)) return(invisible(NULL))
   stopifnot("is_smallORF" %in% names(canonical_paths_c80s))
@@ -425,9 +438,9 @@ plot_coarse_operons <- function(coarse_summary, canonical_paths_c80s,
 #': to keep the PDF a manageable size.
 #'
 #' `fill_by` accepts any subset of `c("beta", "sample_prevalence",
-#' "cor_to_b", "fill_gene")`; one PDF is emitted per mode, named
-#' `fine_operons_<fill_by>.pdf`. Default `c("beta")` matches the
-#' previous single-output behavior.
+#' "cor_to_b", "fill_gene", "gene_label", "focal_type", "focal_label")`
+#' (validated by `.fill_modes_validate`); one PDF is emitted per mode,
+#' named `fine_operons_<fill_by>.pdf`.
 #'
 #' @section Caveat: why decoration reads `neighbor_c80_coarse`, not `neighbor_c80_fine`:
 #' [compute_c80_variants()] appends a `_<length_rank>` suffix to
@@ -587,40 +600,40 @@ plot_fine_operons_by_component <- function(fine_summary, canonical_paths_fine_c8
 }
 
 
-#' Run Step 6 — render all gggenes figures
+#' Run Step 5 — render all gggenes figures
 #'
-#' Orchestrator for Step 6. Renders the four `plot_*` outputs at both
+#' Orchestrator for Step 5. Renders the four `plot_*` outputs at both
 #' global and per-component scope:
 #'
 #' \itemize{
 #'   \item [plot_coarse_operons()] — one PDF per `fill_by` mode at the global level.
 #'   \item [plot_fine_operons()] — fine-isoform analogue.
 #'   \item [plot_coarse_operons_by_component()] — one PDF per
-#'     `(joint_component_id, fill_by)` under `step6_figures/02_by_component_coarse/`.
+#'     `(joint_component_id, fill_by)` under `step5_figures/02_by_component_coarse/`.
 #'   \item [plot_fine_operons_by_component()] — fine analogue under
-#'     `step6_figures/03_by_component_fine/`.
+#'     `step5_figures/03_by_component_fine/`.
 #' }
 #'
 #' Inputs are passed in explicitly so the caller (pipeline.R) is the
-#' one place that loads the four TSVs from disk. Re-running Step 6 in
+#' one place that loads the four TSVs from disk. Re-running Step 5 in
 #' isolation (e.g., to tweak `parse.fill_modes` and re-render without
 #' touching Steps 1-5) is still cheap — load the four TSVs from disk
 #' first and call this function:
 #'
 #' \preformatted{
-#' Rscript -e 'source("pipeline/config.R"); source("pipeline/model.R");
-#'             source("pipeline/parse.R");  source("pipeline/plot.R");
+#' Rscript -e 'source("config.R"); source("model.R");
+#'             source("parse.R");  source("plot.R");
 #'             load_job_config("example.yaml");
 #'             selected_coarse <- read_delim(get_target("parse_selected_coarse"), delim = "\\t", show_col_types = FALSE);
 #'             selected_fine <- read_delim(get_target("parse_selected_fine"), delim = "\\t", show_col_types = FALSE);
 #'             c80s_coarse <- read_delim(get_target("canonical_paths_c80s"), delim = "\\t", show_col_types = FALSE);
 #'             c80s_fine <- read_delim(get_target("canonical_paths_fine_c80s"), delim = "\\t", show_col_types = FALSE);
-#'             run_step6_figures(selected_coarse, selected_fine, c80s_coarse, c80s_fine)'
+#'             run_step5_figures(selected_coarse, selected_fine, c80s_coarse, c80s_fine)'
 #' }
 #'
 #' Reads `fill_modes` from `job_config` via `cfg_get` and resolves the
 #' two figure-output directories via `get_target` (both currently point
-#' to `step6_figures/`).
+#' to `step5_figures/`).
 #'
 #' @param selected_coarse Coarse-summary selection set (read from
 #'   `parse_selected_coarse`); only `uid` is consumed by the plotters as
@@ -633,13 +646,44 @@ plot_fine_operons_by_component <- function(fine_summary, canonical_paths_fine_c8
 #'   `canonical_paths_fine_c80s`).
 #'
 #' @return `invisible(NULL)`. Side effect: PDFs written under
-#'   `step6_figures/`.
+#'   `step5_figures/`.
 #'
 #' @export
-run_step6_figures <- function(selected_coarse, selected_fine, c80s_coarse, c80s_fine) {
+run_step5_figures <- function(selected_coarse, selected_fine, c80s_coarse, c80s_fine) {
   fill_modes <- cfg_get(job_config, "fill_modes")
   fig_coarse <- get_target("parse_coarse_figures")
   fig_fine <- get_target("parse_fine_figures")
+
+  # Drop any fill mode whose backing column isn't present in the c80s tables.
+  # `fill_gene` is derived in-plotter and needs no column. `sample_prevalence`
+  # can be coalesced from `genome_prevalence` (see .prepare_operon_pdf), so
+  # either column satisfies it. All other modes require a column of the same
+  # name. Warn loudly so the user knows what was skipped.
+  required_for <- list(
+    beta              = "beta",
+    cor_to_b          = "cor_to_b",
+    sample_prevalence = c("sample_prevalence", "genome_prevalence"),
+    gene_label        = "gene_label",
+    focal_label       = "focal_label",
+    focal_type        = "focal_type",
+    fill_gene         = character()   # derived in .add_fill_gene_col
+  )
+  have <- union(names(c80s_coarse), names(c80s_fine))
+  fill_modes <- Filter(function(mode) {
+    needed <- required_for[[mode]] %||% mode
+    if (length(needed) == 0) return(TRUE)
+    if (any(needed %in% have)) return(TRUE)
+    warning(sprintf(
+      "Step 5: skipping fill_mode '%s' — no backing column found (looked for %s).",
+      mode, paste(needed, collapse = " or ")
+    ))
+    FALSE
+  }, fill_modes)
+
+  if (length(fill_modes) == 0) {
+    cat(">>> Step 5: no fill_modes have backing columns; no figures rendered.\n")
+    return(invisible(NULL))
+  }
 
   plot_coarse_operons(selected_coarse, c80s_coarse, fig_coarse, fill_modes)
   plot_fine_operons(selected_fine, c80s_fine, fig_fine, fill_modes)

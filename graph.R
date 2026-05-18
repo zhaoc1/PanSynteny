@@ -5,7 +5,7 @@
 # 
 # Author:  Chunyu Zhao <chunyu.zhao@gladstone.ucsf.edu>
 # Created: 2025-07-14
-# Updated: 2026-04-28; 2025-10-10
+# Updated: 2026-04-28
 # ------------------------------------------------------------------------------
 
 library(dplyr)
@@ -630,7 +630,7 @@ compute_joint_components <- function(canonical_paths, edge_types = c("pos", "neg
   joint_edges <- combined_edges %>% select(from, to) %>% distinct()
   
   # build un-directed graph
-  joint_graph <- igraph::graph_from_data_frame(joint_edges, directed = FALSE) #<----- NOTE
+  joint_graph <- igraph::graph_from_data_frame(joint_edges, directed = FALSE)
   
   # Compute connected components
   joint_comps <- components(joint_graph, mode = "weak")$membership
@@ -874,11 +874,11 @@ orient_paths_within_component <- function(dd) {
 #'   neighbor position), with `neighbor_c80_coarse` and
 #'   `neighbor_c80_fine` populated.
 #'
-#' @return The `path_df` frame (one row per per-genome maximal path),
-#'   read back from disk so the same code path runs in both cache-hit
-#'   and cache-miss cases. The companion `esupport_df` is persisted but
-#'   not returned (Step 3 does not consume it; ad-hoc inspection can
-#'   `readRDS(get_target("esupport_df"))`).
+#' @return The `path_df` frame (one row per per-genome maximal path).
+#'   On cache hit, returned from `readRDS`; on cache miss, returned in
+#'   memory after `saveRDS`. The companion `esupport_df` is persisted
+#'   but not returned (Step 3 does not consume it; ad-hoc inspection
+#'   can `readRDS(get_target("esupport_df"))`).
 #'
 #' @export
 run_step2_path_stitching <- function(gene_neighbors) {

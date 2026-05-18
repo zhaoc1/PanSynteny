@@ -276,7 +276,7 @@ orient_focal_gene_neighbors <- function(gene_neighbors, focal_min_genomes) {
     mutate(relative_position = relative_position * orientation) %>%
     arrange(gene_member, relative_position)
   
-  out <- out %>% mutate(group_excludeNA = as.integer(factor(canonical_path))) #<- could rename to oriented_path_id
+  out <- out %>% mutate(group_excludeNA = as.integer(factor(canonical_path)))
   
   out <- out %>% group_by(group_excludeNA) %>% filter(n_distinct(gene_member) >= focal_min_genomes) %>% ungroup()
   out
@@ -477,6 +477,8 @@ parse_gene_neighbor <- function(in_fp, focal_c80, gene_to_c80) {
 
   focal_min_genomes <- cfg_get(job_config, "focal_min_genomes")
   focal_min_total_genomes <- cfg_get(job_config, "focal_min_total_genomes")
+  # `min_positions` doubles as the minimum operon size cut downstream
+  # (compute_relative_positions / compute_operon_size).
   min_operon_size <- cfg_get(job_config, "min_positions")
   upper_bound <- cfg_get(job_config, "upper_bound")
   min_left_neighbors <- cfg_get(job_config, "min_left_neighbors")
@@ -798,8 +800,8 @@ run_step1_neighbor_extraction <- function(focal_c80_df, gene_to_c80) {
   if (file.exists(gene_neighbors_rds)) {
     return(list(
       gene_neighbors = readRDS(get_target("neighbor_groups_rds")),
-      short_gene_prevalence = readRDS(get_target("short_gene_prevalence")),
-      c80_variants_mapping = readRDS(get_target("c80_variants_mapping"))
+      short_gene_prevalence = readr::read_delim(get_target("short_gene_prevalence"), delim = "\t", show_col_types = FALSE),
+      c80_variants_mapping = readr::read_delim(get_target("c80_variants_mapping"), delim = "\t", show_col_types = FALSE)
     ))
   }
 
@@ -817,8 +819,8 @@ run_step1_neighbor_extraction <- function(focal_c80_df, gene_to_c80) {
     select(focal_c80:neighbor_c80_coarse, neighbor_c80_length_coarse, neighbor_c80_fine, neighbor_gene_length, everything())
 
   saveRDS(gene_neighbors, get_target("neighbor_groups_rds"))
-  saveRDS(short_gene_prevalence, get_target("short_gene_prevalence"))
-  saveRDS(c80_variants_mapping, get_target("c80_variants_mapping"))
+  readr::write_delim(short_gene_prevalence, get_target("short_gene_prevalence"), delim = "\t")
+  readr::write_delim(c80_variants_mapping, get_target("c80_variants_mapping"), delim = "\t")
 
   list(
     gene_neighbors = gene_neighbors,

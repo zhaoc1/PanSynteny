@@ -482,12 +482,14 @@ run_step3_consolidation <- function(path_df, c80_variants_mapping,
 
   # Final column reorder + round.
   c80s_coarse <- c80s_coarse %>%
-    select(uid, n_genomes, neighbor_c80_coarse, neighbor_gene_length, neighbor_c80_length_coarse, 
-           genome_prevalence, sample_prevalence, neighbor_c80_coarse:dist_to_smallORFs, everything()) %>%
+    select(uid, n_genomes, neighbor_c80_coarse, neighbor_gene_length, neighbor_c80_length_coarse,
+           genome_prevalence, any_of(c("sample_prevalence", "cor_to_b", "beta")),
+           neighbor_c80_coarse:dist_to_smallORFs, everything()) %>%
     mutate(genome_prevalence = round(genome_prevalence, 3))
   c80s_fine <- c80s_fine %>%
-    select(uid_fine:neighbor_c80_fine, neighbor_c80_length_coarse, genome_prevalence, 
-           sample_prevalence, cor_to_b:is_focal, neighbor_c80_coarse:n_fragmented_c80s, everything()) %>%
+    select(uid_fine:neighbor_c80_fine, neighbor_c80_length_coarse, genome_prevalence,
+           any_of(c("sample_prevalence", "cor_to_b", "beta")),
+           is_focal, neighbor_c80_coarse:n_fragmented_c80s, everything()) %>%
     mutate(genome_prevalence = round(genome_prevalence, 3))
 
   # Persist.

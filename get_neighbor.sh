@@ -16,7 +16,7 @@
 #   run_species.sh -> generate_neighbor_list.sh -> get_neighbor.sh
 # Copied verbatim from
 #   mwas-neighbor-pangraph/pipeline_v1/step1_gene_neighbors/get_neighbor.sh
-# (no hardcoded paths — nothing to integrate).
+# (no hardcoded paths - nothing to integrate).
 # ------------------------------------------------------------------------------
 
 set -e

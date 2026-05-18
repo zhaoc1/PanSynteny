@@ -77,7 +77,7 @@ cluster_80 <- c80_tables$cluster_80
 gene_to_c80 <- c80_tables$gene_to_c80
 rm(c80_tables)
 
-cat("\n[1/6] Step 1 — per-focal neighborhood extraction...\n")
+cat("\n[1/6] Step 1 : per-focal neighborhood extraction...\n")
 # run_step1_neighbor_extraction (neighbor.R) runs the three sub-stages:
 # per-focal extraction, cross-genome assembly, and label attachment
 # (synthetic small-ORF labels + length variants). Writes three RDS caches
@@ -88,14 +88,14 @@ short_gene_prevalence <- res$short_gene_prevalence
 c80_variants_mapping <- res$c80_variants_mapping
 
 
-cat("\n[2/6] Step 2 — per-genome operon graphs to maximal paths...\n")
+cat("\n[2/6] Step 2 : per-genome operon graphs to maximal paths...\n")
 # run_step2_path_stitching (graph.R) calls stitch_paths_across_focal_genes,
 # derives the path_genome_comp join key. Writes path_df.rds + esupport_df.rds
 # and returns path_df.
 path_df <- run_step2_path_stitching(gene_neighbors)
 
 
-cat("\n[3/6] Step 3 — cross-genome consolidation (three granularity levels)...\n")
+cat("\n[3/6] Step 3 : cross-genome consolidation (three granularity levels)...\n")
 # run_step3_consolidation (path.R) builds all six L1/L2/L3 frames, decorates
 # with small-ORF + truncation/fragmentation flags, writes the five
 # canonical-paths TSVs, and returns the three data frames. Step 5 (blocks)
@@ -106,7 +106,7 @@ collapsed_paths <- res$collapsed_paths
 c80s_coarse <- res$c80s_coarse
 
 
-cat("\n[4/6] Step 4 — parse + summaries (selection, sampling, BLAST gene lists)...\n")
+cat("\n[4/6] Step 4 : parse + summaries (selection, sampling, BLAST gene lists)...\n")
 # run_step4_parse (parse.R) loads the three Step 3 TSVs at the call site to
 # keep inputs explicit; itself it builds summaries, applies the
 # fine-coverage isoform filter, attaches the isoform map to coarse_summary,
@@ -119,8 +119,8 @@ per_genome <- read_delim(get_target("canonical_paths_per_genome"), delim = "\t",
 fine_long <- run_step4_parse(c80s_coarse, c80s_fine, per_genome, gene_neighbors)
 
 
-cat("\n[5/6] Step 5 — gggenes figures (writes under step5_figures/)...\n")
-# run_step5_figures (plot.R) — renders global + per-component PDFs for each
+cat("\n[5/6] Step 5 : gggenes figures (writes under step5_figures/)...\n")
+# run_step5_figures (plot.R) : renders global + per-component PDFs for each
 # fill mode. The selection sets are read here at the call site to keep the
 # function inputs explicit; c80s_coarse and c80s_fine are reused from
 # Step 4 above.
@@ -129,8 +129,8 @@ selected_fine <- read_delim(get_target("parse_selected_fine"), delim = "\t", sho
 run_step5_figures(selected_coarse, selected_fine, c80s_coarse, c80s_fine)
 
 
-cat("\n[6/6] Step 6 — focal block extraction (gated; writes under step6_blocks/)...\n")
-# run_step6_blocks (blocks.R) — mines c80s_coarse for runs of focal genes,
+cat("\n[6/6] Step 6 : focal block extraction (gated; writes under step6_blocks/)...\n")
+# run_step6_blocks (blocks.R) : mines c80s_coarse for runs of focal genes,
 # aggregates equivalent blocks across canonical paths, ranks per
 # (component, path_type), drops subset-redundant blocks, walks reps back to
 # per-genome attribution, prints the rep-overlap diagnostic, optionally

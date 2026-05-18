@@ -306,9 +306,9 @@ orient_focal_gene_neighbors <- function(gene_neighbors, focal_min_genomes) {
 #' \itemize{
 #'   \item **Two resolution levels** exist throughout:
 #'     \itemize{
-#'       \item `group_excludeNA` — the *broad* orientation group (set upstream
+#'       \item `group_excludeNA` - the *broad* orientation group (set upstream
 #'         by [orient_focal_gene_neighbors()]), NA-agnostic.
-#'       \item `group_includeNA` — the *detailed* pattern within a broad group,
+#'       \item `group_includeNA` - the *detailed* pattern within a broad group,
 #'         distinguishing unannotated genes by length.
 #'     }
 #'     Only the dominant detailed pattern within each broad group survives.
@@ -755,7 +755,7 @@ load_neighbors_across_genomes <- function(input_dir, mc_cores = NULL) {
 }
 
 
-#' Run Step 1 — per-focal neighborhood extraction + label attachment
+#' Run Step 1 - per-focal neighborhood extraction + label attachment
 #'
 #' Orchestrator for Step 1. Three sub-stages, all gated on the existence
 #' of the cached `neighbor_groups_rds`:
@@ -786,12 +786,12 @@ load_neighbors_across_genomes <- function(input_dir, mc_cores = NULL) {
 #'   (from [load_c80_tables()] in midas.R).
 #'
 #' @return A list with three named entries:
-#'   * `gene_neighbors` — unified neighbor table (per focal, per
+#'   * `gene_neighbors` - unified neighbor table (per focal, per
 #'     genome, per neighbor position) with both `neighbor_c80_coarse`
 #'     and `neighbor_c80_fine` populated.
-#'   * `short_gene_prevalence` — per-synthetic-c80 prevalence map for
+#'   * `short_gene_prevalence` - per-synthetic-c80 prevalence map for
 #'     unannotated short ORFs.
-#'   * `c80_variants_mapping` — `(neighbor_c80_coarse,
+#'   * `c80_variants_mapping` - `(neighbor_c80_coarse,
 #'     neighbor_gene_length) -> neighbor_c80_fine` mapping.
 #'
 #' @export

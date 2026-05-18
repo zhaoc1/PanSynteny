@@ -4,12 +4,12 @@
 # Canonical-path expansion: turn canonical_paths and canonical_paths_fine into
 # the long-format, join-able TSVs that downstream analysis consumes.
 #
-#   explode_canonical_into_collapsed_paths   — shared provenance walker (canonical -> collapsed → per-genome).
-#   expand_canonical_paths_to_fine           — per-isoform aggregate view.
-#   expand_canonical_paths_per_genome        — per-genome master table.
-#   build_canonical_paths_c80s               — coarse per-gene anchor (max length).
-#   build_canonical_paths_fine_c80s          — fine per-gene anchor (per-isoform length).
-#   run_step3_consolidation                  — Step 3 orchestrator: builds all L1/L2/L3 frames and writes the five TSVs.
+#   explode_canonical_into_collapsed_paths   - shared provenance walker (canonical -> collapsed → per-genome).
+#   expand_canonical_paths_to_fine           - per-isoform aggregate view.
+#   expand_canonical_paths_per_genome        - per-genome master table.
+#   build_canonical_paths_c80s               - coarse per-gene anchor (max length).
+#   build_canonical_paths_fine_c80s          - fine per-gene anchor (per-isoform length).
+#   run_step3_consolidation                  - Step 3 orchestrator: builds all L1/L2/L3 frames and writes the five TSVs.
 #
 # Author:  Chunyu Zhao <chunyu.zhao@gladstone.ucsf.edu>
 # Created: 2025-10-10 (extracted from graph.R)
@@ -44,16 +44,16 @@ library(purrr)
 #' same collapsed row inherits that collapsed row's `needs_flip` value.
 #' Callers that need to flip the fine string (or any other
 #' direction-sensitive per-position payload) just consume the inherited
-#' boolean and call `rev()` on the token vector — no fine-level direction
+#' boolean and call `rev()` on the token vector - no fine-level direction
 #' decision is required.
 #'
 #' This is sound because both [normalize_path()] (R2) and
 #' [orient_paths_within_component()] (R3) are **orientation-only**: they pick
 #' between `forward` and `reverse(forward)` of the same token vector and
 #' never reorder tokens within a direction or change token content. As a
-#' result, coarse and fine path strings stay **position-aligned** — the
+#' result, coarse and fine path strings stay **position-aligned** - the
 #' fine token at position k corresponds to the coarse cluster at
-#' position k — so a coarse reversal at the position level is exactly
+#' position k - so a coarse reversal at the position level is exactly
 #' the right operation at fine resolution too. One coarse boolean drives
 #' all per-position flips.
 #'
@@ -113,8 +113,8 @@ explode_canonical_into_collapsed_paths <- function(c_paths, collapsed_paths, pat
 #' contributing collapsed row whose `c80_path_coarse` does not match the
 #' canonical direction is considered "flipped" and its fine string is
 #' token-reversed to align. Because both [normalize_path()] and
-#' [orient_paths_within_component()] only reverse paths — never change token
-#' content — this binary equality check is sufficient; no independent
+#' [orient_paths_within_component()] only reverse paths - never change token
+#' content - this binary equality check is sufficient; no independent
 #' normalization of the fine string is required, which sidesteps palindrome
 #' and suffix-reordering ambiguity.
 #'
@@ -149,7 +149,7 @@ expand_canonical_paths_to_fine <- function(c_paths, collapsed_paths, path_df) {
       # Per-canonical sequential rank (1 = most-supported isoform). Ties on
       # n_fine_genomes are broken alphabetically by c80_path_fine_canonical so the
       # numbering is deterministic and isoform_rank is strictly unique within
-      # canonical_path_id — required so uid_fine identifies one isoform.
+      # canonical_path_id - required so uid_fine identifies one isoform.
       isoform_rank = row_number(),
       # Self-describing composite key: canonical_path_id + iso + rank.
       # E.g. "cp_5_iso1", "cp_5_iso2". Unique within canonical_path_id.
@@ -178,7 +178,7 @@ expand_canonical_paths_to_fine <- function(c_paths, collapsed_paths, path_df) {
 #' observation with full attribution: which genome, which collapsed group,
 #' whether the observation was reverse-oriented, and raw + canonical-aligned
 #' path renderings at three resolutions (gene-id, fine c80-label, coarse c80).
-#' Complementary to [expand_canonical_paths_to_fine()] — the two functions
+#' Complementary to [expand_canonical_paths_to_fine()] - the two functions
 #' walk the same provenance chain but stop at different aggregation grains.
 #'
 #' @export
@@ -191,7 +191,7 @@ expand_canonical_paths_per_genome <- function(c_paths, collapsed_paths, path_df,
   # fine-c80 canonical string used only as the join key into c_paths_fine
   # (dot-prefixed; dropped at the end).
   # `needs_flip` was set in the explode walker by comparing c80_path_coarse
-  # vs canonical_path_coarse — one boolean drives both flips because
+  # vs canonical_path_coarse - one boolean drives both flips because
   # normalize_path + orient_paths_within_component are orientation-only.
   rows <- rows %>%
     rowwise() %>%
@@ -224,7 +224,7 @@ expand_canonical_paths_per_genome <- function(c_paths, collapsed_paths, path_df,
                               c80_path_fine_canonical, fine_canonical_id, isoform_rank) %>% distinct(),
       by = c("canonical_path_id", ".c80_path_fine_canonical" = "c80_path_fine_canonical"))
 
-  # Final output (Option A — lean): keep join keys + per-genome attribution +
+  # Final output (Option A - lean): keep join keys + per-genome attribution +
   # gene-id renderings + needs_flip. Drop the upstream path-string payloads
   # (each is 1:1 with an ID we kept, or recoverable from gene_path) and the
   # temp join key. Any path string can be re-attached via a join to
@@ -251,7 +251,7 @@ expand_canonical_paths_per_genome <- function(c_paths, collapsed_paths, path_df,
 #' Turn each canonical path into a long-format, gene-level table at coarse
 #' `centroid_80` resolution and attach per-gene annotations: joint component
 #' membership, path type + genome support, a representative gene length per
-#' c80 cluster (max over isoforms — see Details), microslam-only gene
+#' c80 cluster (max over isoforms - see Details), microslam-only gene
 #' metadata, and cluster_80 metadata. Output is the main per-gene coarse
 #' anchor consumed by downstream trait analysis, block aggregation, and
 #' per-component plotting.
@@ -278,7 +278,7 @@ build_canonical_paths_c80s <- function(c_paths, c80_variants_mapping, focal_c80_
     left_join(c_paths %>% select(uid, joint_component_ids, canonical_path_id, path_type, n_genomes, neighbor_genomes) %>% unique(), by = c("canonical_path_id"))
 
   # Coarse gene length: collapse c80_variants_mapping to one row per c80 (max length).
-  # IMPORTANT — the resulting `neighbor_gene_length` column is misnamed.
+  # IMPORTANT - the resulting `neighbor_gene_length` column is misnamed.
   # It is NOT a single observed gene's length. It is the MAXIMUM length
   # observed across all isoforms of this c80 cluster in the data.
   # Sometimes, the full c80 is not in the operon, => neighbor_gene_length < centroid_80_length
@@ -331,7 +331,7 @@ build_canonical_paths_c80s <- function(c_paths, c80_variants_mapping, focal_c80_
 #' @details
 #' **`isoform_rank`** is assigned via `row_number()` within each
 #' `canonical_path_id`, sorted by `desc(n_fine_genomes)` then by
-#' `c80_path_fine_canonical` alphabetically — rank 1 = most-supported isoform,
+#' `c80_path_fine_canonical` alphabetically - rank 1 = most-supported isoform,
 #' ties broken by canonical-string order so the rank is strictly unique
 #' (and so `uid_fine` identifies one isoform).
 #'
@@ -390,7 +390,7 @@ build_canonical_paths_fine_c80s <- function(c_paths_fine, c80_variants_mapping,
 }
 
 
-#' Run Step 3 — cross-genome consolidation
+#' Run Step 3 - cross-genome consolidation
 #'
 #' Orchestrator that takes per-genome maximal paths (`path_df` from Step 2)
 #' and returns the canonical-operon view at three granularity levels (L1
@@ -412,10 +412,10 @@ build_canonical_paths_fine_c80s <- function(c_paths_fine, c80_variants_mapping,
 #' @param short_gene_prevalence Synthetic-c80 prevalence map for short ORFs.
 #'
 #' @return A list with the in-memory frames Step 4 still needs:
-#'   * `c_paths` — L1 canonical-paths table
-#'   * `collapsed_paths` — pre-canonicalisation collapse, used by
+#'   * `c_paths` - L1 canonical-paths table
+#'   * `collapsed_paths` - pre-canonicalisation collapse, used by
 #'     `map_representatives_to_genomes()`
-#'   * `c80s_coarse` — L1 per-gene table fed to `aggregate_blocks()`
+#'   * `c80s_coarse` - L1 per-gene table fed to `aggregate_blocks()`
 #'
 #' The other three frames (`c_paths_fine`, `c80s_fine`, `c_paths_per_genome`)
 #' are written to disk only; Step 5 re-reads them from disk so this
@@ -430,23 +430,23 @@ run_step3_consolidation <- function(path_df, c80_variants_mapping,
   # operon tables (each emitted at one or two resolutions, see writes below):
   #
   #   Level 1 (coarse / canonical):
-  #     - collapse_paths_across_genomes()    — one row per coarse-string + path_type
-  #     - generate_canonical_path()          — unify forward/reverse, gate on path_min_genomes
-  #     - compute_joint_components()         — gene-level connected components (joint, type-blind)
-  #     - decorate_paths_with_components()   — attach joint_component_ids per path
-  #     - orient_paths_within_component()    — align within-component direction
-  #     - build_canonical_paths_c80s()       — explode to per-gene rows (coarse)
+  #     - collapse_paths_across_genomes()    - one row per coarse-string + path_type
+  #     - generate_canonical_path()          - unify forward/reverse, gate on path_min_genomes
+  #     - compute_joint_components()         - gene-level connected components (joint, type-blind)
+  #     - decorate_paths_with_components()   - attach joint_component_ids per path
+  #     - orient_paths_within_component()    - align within-component direction
+  #     - build_canonical_paths_c80s()       - explode to per-gene rows (coarse)
   #   Level 2 (per-isoform):
-  #     - expand_canonical_paths_to_fine()       — resolve length-variant isoforms
-  #     - build_canonical_paths_fine_c80s()      — explode to per-gene rows (fine)
+  #     - expand_canonical_paths_to_fine()       - resolve length-variant isoforms
+  #     - build_canonical_paths_fine_c80s()      - explode to per-gene rows (fine)
   #   Level 3 (per-genome):
-  #     - expand_canonical_paths_per_genome()    — one row per (canonical, contributing genome)
+  #     - expand_canonical_paths_per_genome()    - one row per (canonical, contributing genome)
   
   path_min_genomes <- cfg_get(job_config, "path_min_genomes")
   truncation_cutoff <- cfg_get(job_config, "truncation_cutoff")
 
   # Collapse + canonicalise direction + joint components + within-component
-  # re-orientation. This is the "consolidation" half of the step — every row
+  # re-orientation. This is the "consolidation" half of the step - every row
   # surviving here is a recurring operon backed by ≥ path_min_genomes strains.
   collapsed_paths <- collapse_paths_across_genomes(path_df)
   c_paths <- generate_canonical_path(collapsed_paths, path_min_genomes)
@@ -471,7 +471,7 @@ run_step3_consolidation <- function(path_df, c80_variants_mapping,
                                                cluster_80, jc_map, short_gene_prevalence) %>%
     relocate(neighbor_c80_coarse, .after = centroid_80_genome_counts)
 
-  # Decorate. Truncation/fragmentation are fine-only by design — see
+  # Decorate. Truncation/fragmentation are fine-only by design - see
   # decorate_c80s_w_truncation docstring for why.
   c80s_coarse <- decorate_c80s_w_smallORFs(c80s_coarse, group_key = "uid")
   c80s_fine <- decorate_c80s_w_smallORFs(c80s_fine,   group_key = "uid_fine") %>%

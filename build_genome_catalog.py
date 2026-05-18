@@ -59,7 +59,7 @@ unambiguous, so a duplicate genome_id across sources is reported and the build
 STOPS (the partially-written genes_info.tsv is removed; genome_toc.tsv is only
 written after the dup check passes, so it's never left in a bad state).
 
-`sources:` is consumed only here — config.R ignores it (it is a list, not a
+`sources:` is consumed only here - config.R ignores it (it is a list, not a
 scalar section), so the R pipeline is unaffected.
 
 Run order: build_genome_catalog.py -> prepare.R -> run_species.sh -> pipeline.R
@@ -79,7 +79,7 @@ from pathlib import Path
 try:
     import yaml
 except ImportError:
-    sys.exit("ERROR: pyyaml not importable — activate the strain-aware-operon "
+    sys.exit("ERROR: pyyaml not importable - activate the strain-aware-operon "
              "conda env (or set its python on PATH).")
 
 # Direct import beats subprocess: one python process, no env-detection dance.
@@ -87,7 +87,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 try:
     from gff_to_genes import parse_gff_to_tsv
 except ImportError as exc:
-    sys.exit(f"ERROR: cannot import gff_to_genes ({exc}) — activate the "
+    sys.exit(f"ERROR: cannot import gff_to_genes ({exc}) - activate the "
              "strain-aware-operon conda env (it needs gffutils).")
 
 
@@ -161,7 +161,7 @@ def load_config(config_path: Path):
         # length_col: midas defaults to UHGG's col 8; prokka must declare it,
         # since its membership schema is user-controlled.
         if s["type"] == "prokka" and "length_col" not in s:
-            sys.exit(f"ERROR: source '{s['name']}' (prokka) requires `length_col` — "
+            sys.exit(f"ERROR: source '{s['name']}' (prokka) requires `length_col` - "
                      "prokka membership must include gene_length as a named column.")
         length_col = int(s.get("length_col", DEFAULT_LENGTH_COL))
 
@@ -228,7 +228,7 @@ def _scan_membership(src: dict, genes_info_out, must_have_idx: int) -> set:
 
 
 def process_midas_source(src: dict, genes_info_out, toc_entries: list):
-    """Midas source — single pass: gene_length comes straight from a column
+    """Midas source - single pass: gene_length comes straight from a column
     in the membership file (UHGG's `genes_info.tsv` puts it at col 8). The
     .genes files are part of the midasdb and assumed present (not validated).
     """

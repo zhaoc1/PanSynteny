@@ -7,11 +7,11 @@
 # Walks from per-gene trait statistics along canonical operon paths to a
 # ranked set of focal block representatives with per-genome
 # attribution. Four stages:
-#   keep_focal_blocks()               — per-canonical-path focal gate + block clustering.
-#   aggregate_blocks()                — focal-block extraction + cross-path aggregation.
-#   rank_block_representatives()      — dominant-block selection + ranking.
-#   map_representatives_to_genomes()  — per-genome attribution for reps.
-#   run_step6_blocks()      — Step 6 orchestrator: runs all stages, writes outputs.
+#   keep_focal_blocks()               - per-canonical-path focal gate + block clustering.
+#   aggregate_blocks()                - focal-block extraction + cross-path aggregation.
+#   rank_block_representatives()      - dominant-block selection + ranking.
+#   map_representatives_to_genomes()  - per-genome attribution for reps.
+#   run_step6_blocks()      - Step 6 orchestrator: runs all stages, writes outputs.
 #
 # Author:  Chunyu Zhao <chunyu.zhao@gladstone.ucsf.edu>
 # Created: 2025-10-10 (extracted from pipeline.R; renumbered to Step 6 on 2026-05-15)
@@ -211,7 +211,7 @@ rank_block_representatives <- function(block_agg, min_overlap = 1) {
 #' identifier `uid` for downstream use.
 #'
 #' @details
-#' **Sanity check**: `stopifnot(path_type == path_type_per_genome)` — the block's
+#' **Sanity check**: `stopifnot(path_type == path_type_per_genome)` - the block's
 #' `path_type` must agree with the per-genome `path_type` joined in from
 #' `path_df` for every row, confirming the provenance chain stayed
 #' type-consistent. The per-genome column is dropped before returning.
@@ -230,7 +230,7 @@ map_representatives_to_genomes <- function(representatives, canonical_paths, col
   # 2) Attach per-genome attribution to each representative block.
   #    `block_uid` is inherited from `representatives` (constructed in
   #    rank_block_representatives). `canonical_paths` and `canonical_uids` are
-  #    parallel `;`-joined lists — `separate_rows` explodes them together so
+  #    parallel `;`-joined lists - `separate_rows` explodes them together so
   #    each exploded row pairs one canonical_path_id with its canonical uid.
   rep_slim <- representatives %>%
     select(block_uid, joint_component_id, path_type, rep_rank,
@@ -255,7 +255,7 @@ map_representatives_to_genomes <- function(representatives, canonical_paths, col
 #' Within each `(joint_component_id, path_type)` group, count pairs of
 #' representatives that share a contiguous substring of ≥ `min_shared`
 #' tokens but neither contains the other. These are the cases
-#' [annotate_group()]'s subset-only redundancy check cannot collapse —
+#' [annotate_group()]'s subset-only redundancy check cannot collapse -
 #' they survive as separate reps and potentially double-count genomes in
 #' `rep_slim`.
 #'
@@ -320,7 +320,7 @@ diagnose_rep_overlaps <- function(representatives, min_shared = 2) {
 #' not yet wired in (see parked/ROADMAP.md R2).
 #'
 #' **Superpaths are not redundant.** A block that *contains* an existing
-#' rep gets its own rank — it adds information (length-variant extension)
+#' rep gets its own rank - it adds information (length-variant extension)
 #' relative to the shorter rep.
 annotate_group <- function(df_group, keys, selected_tbl, min_overlap = 1) {
   sel <- keys %>%
@@ -423,7 +423,7 @@ get_relation <- function(path, sel_path, min_overlap = 1) {
 }
 
 
-#' Run Step 6 — focal block extraction + representative ranking
+#' Run Step 6 - focal block extraction + representative ranking
 #'
 #' Orchestrator for Step 6. Mines `c80s_coarse` for runs of focal genes
 #' ("hit blocks"), aggregates equivalent runs across canonical paths,

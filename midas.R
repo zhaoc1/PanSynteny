@@ -26,7 +26,7 @@ library(stringr)
 #' @param c80_fp Path to the clusters_80 TSV (species-scoped midasdb file;
 #'   `get_target("clusters_80_updated")`).
 #' @param genes_fp Path to the unified genome-catalog `genes_info.tsv` built
-#'   by `build_genome_catalog.py` — header `gene_id, centroid_80,
+#'   by `build_genome_catalog.py` - header `gene_id, centroid_80,
 #'   gene_length`. Use `get_target("catalog_genes_info")`. (The legacy
 #'   midasdb `genes_annotated.tsv` works too, since the function only reads
 #'   those three columns.)
@@ -72,7 +72,7 @@ load_c80_tables <- function(c80_fp, genes_fp) {
 #'
 #' In addition to writing synthetic labels, the function emits a
 #' `neighbor_c80_genome_prevalence` column for short-gene rows holding a
-#' **within-focal intra-short-gene proportion** — the fraction of distinct
+#' **within-focal intra-short-gene proportion** - the fraction of distinct
 #' `neighbor_gene_id`s that share the synthetic label, relative to all short
 #' genes for that focal, negated (`-1 *`) as a sign-based marker so
 #' downstream code can distinguish short-gene prevalence from genome-wide
@@ -83,7 +83,7 @@ load_c80_tables <- function(c80_fp, genes_fp) {
 #' @details
 #' **Scope of synthetic labels.** Because labels contain `focal_c80`, the same
 #' physical short gene appearing next to two different focals receives two
-#' different synthetic labels — intentional, since analyses are focal-scoped.
+#' different synthetic labels - intentional, since analyses are focal-scoped.
 #' Do not compare synthetic labels across focals.
 #'
 #' **Tie-breaking in rank.** When multiple `(gene_type, length)` pairs share
@@ -185,8 +185,8 @@ assign_c80_to_short_genes <- function(gene_neighbors) {
 #' ordinal position of the length (smallest = 1) within the cluster.
 #'
 #' Unlike [compute_short_gene_prevalence()], this function is the sibling operation
-#' for **annotated** (non-NA) `neighbor_c80_coarse` values. It is globally scoped —
-#' not per-focal — because real c80 clusters are defined once at database
+#' for **annotated** (non-NA) `neighbor_c80_coarse` values. It is globally scoped -
+#' not per-focal - because real c80 clusters are defined once at database
 #' build time, so their length variants are intrinsic properties of the
 #' cluster rather than focal-dependent artifacts.
 #'
@@ -205,7 +205,7 @@ assign_c80_to_short_genes <- function(gene_neighbors) {
 #' safety but is not reached in normal input.
 #'
 #' **Global vs focal scope.** The resulting `neighbor_c80_fine` is a global
-#' identifier — the same length variant of the same cluster receives the same
+#' identifier - the same length variant of the same cluster receives the same
 #' label regardless of which focal neighborhood it appears in. Downstream
 #' code can therefore use `neighbor_c80_coarse` for cluster-level coarse grouping
 #' (all lengths collapsed) or `neighbor_c80_fine` for length-sensitive

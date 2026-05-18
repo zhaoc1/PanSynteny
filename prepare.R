@@ -1,7 +1,7 @@
 # ------------------------------------------------------------------------------
 # prepare.R
 #
-# Step 0 — input setup for the strain-aware operon pipeline.
+# Step 0: input setup for the strain-aware operon pipeline.
 #
 # Four responsibilities:
 #   (1) Snapshot the input YAML to the project directory for provenance
@@ -77,8 +77,8 @@ if (!file.exists(clusters_dst)) {
 
 # (2) Build focal_c80_df from focal_meta (input) and cache the (possibly
 # threshold-derived) result back as focal_meta (output, in step1_setup/).
-# The YAML key data.focal_meta names the *input* file — wherever the user
-# keeps it — and get_target("focal_meta") names the *cached output* under
+# The YAML key data.focal_meta names the *input* file - wherever the user
+# keeps it - and get_target("focal_meta") names the *cached output* under
 # step1_setup/. pipeline.R reads the cached output.
 cat("\n[3/4] Processing focal_meta...\n")
 focal_fp <- cfg_get(job_config, "focal_meta")
@@ -124,7 +124,7 @@ if (!is.null(score_col) && is.character(score_col) && nzchar(score_col)) {
 } else {
   if (!("is_focal" %in% names(focal_c80_df))) {
     stop(sprintf(
-      "focal_meta has no `is_focal` column and prepare.score_col is unset — provide one or the other (focal_meta columns: %s)",
+      "focal_meta has no `is_focal` column and prepare.score_col is unset - provide one or the other (focal_meta columns: %s)",
       paste(names(focal_c80_df), collapse = ", ")
     ))
   }
@@ -163,6 +163,6 @@ if (length(genes_missing) > 0) {
   cat(sprintf("  next: bash run_species.sh %s\n", args[1]))
 } else {
   if (file.exists(gene_list_fp)) file.remove(gene_list_fp)
-  cat(sprintf("  all %d focal centroids have neighbor TSVs — ready to run pipeline.R\n",
+  cat(sprintf("  all %d focal centroids have neighbor TSVs - ready to run pipeline.R\n",
               length(genes_focal)))
 }

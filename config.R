@@ -18,7 +18,7 @@ load_job_config <- function(yaml_path) {
 
   # Expand `{proj_dir}`, `{species_id}`, `{midasdb_dir}`, `{input_dir}`
   # placeholders in every string scalar in the YAML (recursively). Lets users
-  # shorten repetitive paths in the config —
+  # shorten repetitive paths in the config -
   # `data.focal_meta: "{input_dir}/focal_table.tsv"` instead of the full path.
   # `{input_dir}` keeps user-provided inputs separate from `{proj_dir}`
   # (the output root). Mirrors the placeholder system `build_genome_catalog`

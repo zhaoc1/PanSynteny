@@ -446,8 +446,8 @@ plot_coarse_operons <- function(coarse_summary, canonical_paths_c80s,
 #' [compute_c80_variants()] appends a `_<length_rank>` suffix to
 #' `neighbor_c80_fine` when a c80 cluster has multiple observed lengths.
 #' Decoding from that column would yield an incorrect `smallORF_type`:
-#' the `_\d+$` stripper removes only one trailing `_<digits>` chunk —
-#' the length-rank suffix — leaving the inner gene-type rank attached.
+#' the `_\d+$` stripper removes only one trailing `_<digits>` chunk -
+#' the length-rank suffix - leaving the inner gene-type rank attached.
 #' Example: `_GUT_001-CDS_1_2` would decode to `smallORF_type = "CDS_1"`
 #' instead of `"CDS"`. `decorate_c80s_w_smallORFs` hardcodes
 #' `neighbor_c80_coarse` as the source to avoid this.
@@ -600,24 +600,24 @@ plot_fine_operons_by_component <- function(fine_summary, canonical_paths_fine_c8
 }
 
 
-#' Run Step 5 — render all gggenes figures
+#' Run Step 5 - render all gggenes figures
 #'
 #' Orchestrator for Step 5. Renders the four `plot_*` outputs at both
 #' global and per-component scope:
 #'
 #' \itemize{
-#'   \item [plot_coarse_operons()] — one PDF per `fill_by` mode at the global level.
-#'   \item [plot_fine_operons()] — fine-isoform analogue.
-#'   \item [plot_coarse_operons_by_component()] — one PDF per
+#'   \item [plot_coarse_operons()] - one PDF per `fill_by` mode at the global level.
+#'   \item [plot_fine_operons()] - fine-isoform analogue.
+#'   \item [plot_coarse_operons_by_component()] - one PDF per
 #'     `(joint_component_id, fill_by)` under `step5_figures/02_by_component_coarse/`.
-#'   \item [plot_fine_operons_by_component()] — fine analogue under
+#'   \item [plot_fine_operons_by_component()] - fine analogue under
 #'     `step5_figures/03_by_component_fine/`.
 #' }
 #'
 #' Inputs are passed in explicitly so the caller (pipeline.R) is the
 #' one place that loads the four TSVs from disk. Re-running Step 5 in
 #' isolation (e.g., to tweak `parse.fill_modes` and re-render without
-#' touching Steps 1-5) is still cheap — load the four TSVs from disk
+#' touching Steps 1-5) is still cheap - load the four TSVs from disk
 #' first and call this function:
 #'
 #' \preformatted{
@@ -674,7 +674,7 @@ run_step5_figures <- function(selected_coarse, selected_fine, c80s_coarse, c80s_
     if (length(needed) == 0) return(TRUE)
     if (any(needed %in% have)) return(TRUE)
     warning(sprintf(
-      "Step 5: skipping fill_mode '%s' — no backing column found (looked for %s).",
+      "Step 5: skipping fill_mode '%s' - no backing column found (looked for %s).",
       mode, paste(needed, collapse = " or ")
     ))
     FALSE

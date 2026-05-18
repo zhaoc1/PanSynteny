@@ -4,7 +4,7 @@
 
 **Status:** Testing release v0.2.0. Prototype — the YAML schema and output column set may change between 0.x.y versions. Not yet for production.
 
-Given (1) a pan-genome (centroid_80 clusters from MIDAS) and (2) a user-curated focal-gene table (which centroid_80 clusters to investigate), this pipeline reconstructs **de novo recurring operons** the focal genes live in and harmonizes them across the strains in the species-level pangenome. Optionally, it also extracts the contiguous focal-gene blocks (grouped by `focal_label` direction) within each operon. Outputs are emitted at three granularity levels — coarse canonical operon, length-variant isoform, and per-genome instance — so you can ask either "what operon is this" or "which strains carry which variant."
+Given (1) a pan-genome (centroid_80 clusters from MIDAS) and (2) a user-curated focal-gene table (which centroid_80 clusters to investigate), this pipeline reconstructs **de novo recurring operons** the focal genes live in and harmonizes them across the strains in the species-level pangenome. Outputs are emitted at three granularity levels: coarse canonical operon, length-variant isoform, and per-genome instance - so you can ask either "what operon is this" or "which strains carry which variant." Optionally, it also extracts the contiguous focal-gene blocks (grouped by `focal_label` direction) within each operon. 
 
 ---
 
@@ -73,7 +73,7 @@ python -c "import yaml, gffutils; print(yaml.__version__, gffutils.__version__)"
    | `step3_path/canonical_paths*.tsv` | Operons at three granularity levels (coarse → fine → per-genome) |
    | `step4_parse/` | Operon summaries, fine-isoform selection, BLAST gene-id lists |
    | `step5_figures/*.pdf` | gggenes operon visualizations |
-   | `step6_blocks/{representative_path.tsv, rep.tsv, rep_heatmap.pdf}` | Trait-associated blocks + per-strain attribution (gated by `blocks.skip_block`) |
+   | `step6_blocks/rep.tsv` | Trait-associated blocks + per-strain attribution (gated by `blocks.skip_block`) |
 
    Column-level schemas live in [SCHEMA.md](docs/SCHEMA.md).
 

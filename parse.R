@@ -1,37 +1,37 @@
 # ------------------------------------------------------------------------------
 # parse.R
 #
-# Step 5 orchestrator + reusable post-processing helpers for the Step 3
-# canonical-paths outputs. `run_step5_parse` is the entry point called by
+# Step 4 orchestrator + reusable post-processing helpers for the Step 3
+# canonical-paths outputs. `run_step4_parse` is the entry point called by
 # pipeline.R; the individual helpers below are also safe to call standalone
 # on Step 3 outputs (canonical_paths_c80s, canonical_paths_fine_c80s,
 # canonical_paths_per_genome) for ad-hoc analysis.
 #
-#   decorate_c80s_w_smallORFs       —  decode synthetic small-ORF labels; add is_smallORF, centroid_80,
+#   decorate_c80s_w_smallORFs       -  decode synthetic small-ORF labels; add is_smallORF, centroid_80,
 #                                         smallORF_type, n_smallORFs, dist_to_smallORFs.
-#   decorate_c80s_w_truncation      —  flag truncated and fragmented c80s; add is_truncated, truncate_ratio,
+#   decorate_c80s_w_truncation      -  flag truncated and fragmented c80s; add is_truncated, truncate_ratio,
 #                                         n_truncated, is_fragmented, n_fragmented_c80s, fragmented_c80s.
-#   summarize_coarse_operons        —  one row per `uid` (expects decorated coarse c80s).
-#   summarize_fine_isoforms         —  one row per `uid_fine` (expects decorated fine c80s).
-#   sample_genome_from_fine_paths   —  fine-only sampler (one genome per surviving isoform);
+#   summarize_coarse_operons        -  one row per `uid` (expects decorated coarse c80s).
+#   summarize_fine_isoforms         -  one row per `uid_fine` (expects decorated fine c80s).
+#   sample_genome_from_fine_paths   -  fine-only sampler (one genome per surviving isoform);
 #                                       long-format per-gene table with provenance +
 #                                       gene_neighbors metadata merged.
-#   enrich_fine_long                —  left-join per-isoform context from c80s_fine
+#   enrich_fine_long                -  left-join per-isoform context from c80s_fine
 #                                       (trait stats, small-ORF + truncation flags,
 #                                       centroid_80) onto fine_long.
-#   write_blast_gene_lists          —  per-(uid_fine, neighbor_genome) gene-id TSVs for BLAST.
-#   assign_c80_label                —  per-row pos/neg/neu/anchor label from a trait stat;
-#                                       used by decorate_with_updated_path_type and the Step 6 plotters.
-#   decorate_with_updated_path_type —  per-(component, canonical_path, path_type) summary;
+#   write_blast_gene_lists          -  per-(uid_fine, neighbor_genome) gene-id TSVs for BLAST.
+#   assign_c80_label                -  per-row pos/neg/neu/anchor label from a trait stat;
+#                                       used by decorate_with_updated_path_type and the Step 5 plotters.
+#   decorate_with_updated_path_type -  per-(component, canonical_path, path_type) summary;
 #                                       adds c80_label_combo, purity_status, updated_path_type
 #                                       (anchor_pos / anchor_neg / anchor_mixed). Facet variable
-#                                       for the Step 6 per-component plotters.
-#   run_step5_parse                 —  Step 5 orchestrator: builds summaries + selection sets,
+#                                       for the Step 5 per-component plotters.
+#   run_step4_parse                 -  Step 4 orchestrator: builds summaries + selection sets,
 #                                       samples one exemplar genome per surviving fine isoform,
 #                                       writes five TSVs and the BLAST gene-id directory.
 #
-# Step 6 gggenes plotters (`plot_coarse/fine_operons`, `plot_*_by_component`,
-# `run_step6_figures`) and their layout/scale helpers live in plot.R.
+# Step 5 gggenes plotters (`plot_coarse/fine_operons`, `plot_*_by_component`,
+# `run_step5_figures`) and their layout/scale helpers live in plot.R.
 #
 # Author:   Chunyu Zhao <chunyu.zhao@gladstone.ucsf.edu>
 # Created:  2026-04-24
@@ -51,25 +51,25 @@ library(stringr)
 #' small-ORF metrics. Six columns added; original columns and row order
 #' are preserved.
 #'
-#' * **`is_smallORF`** — `TRUE` when the gene id starts with `_`.
-#' * **`centroid_80`** — for small-ORF rows, the **focal_c80** decoded from
+#' * **`is_smallORF`** - `TRUE` when the gene id starts with `_`.
+#' * **`centroid_80`** - for small-ORF rows, the **focal_c80** decoded from
 #'   the synthetic label (everything between the leading `_` and the last
 #'   `-`). For normal rows, equal to `neighbor_c80_coarse`. The shared
 #'   `centroid_80` is what makes the per-focal scoping in `dist_to_smallORFs`
 #'   meaningful: a focal gene and the small ORFs derived from its
 #'   neighborhood land in the same `(group_key, centroid_80)` subgroup.
-#' * **`smallORF_type`** — for small-ORF rows, the `<gene_type>` token
+#' * **`smallORF_type`** - for small-ORF rows, the `<gene_type>` token
 #'   (`"CDS"`, `"tRNA"`, etc.); the trailing `_<rank>` disambiguator is
 #'   stripped. NA for normals.
-#' * **`n_smallORFs`** — per-operon count of small-ORF rows within
+#' * **`n_smallORFs`** - per-operon count of small-ORF rows within
 #'   `group_key`, broadcast to every row of that operon (same value on all
 #'   rows of a given `uid` / `uid_fine`).
-#' * **`n_focal`** — per-operon count of focal rows (`is_focal == TRUE`)
+#' * **`n_focal`** - per-operon count of focal rows (`is_focal == TRUE`)
 #'   within `group_key`, broadcast to every row of that operon. NA values
-#'   in `is_focal` are coalesced to FALSE so non-`gene_meta` rows
-#'   (short ORFs, neighbors absent from `gene_meta`) correctly count as
+#'   in `is_focal` are coalesced to FALSE so non-`focal_meta` rows
+#'   (short ORFs, neighbors absent from `focal_meta`) correctly count as
 #'   non-focal.
-#' * **`dist_to_smallORFs`** — for focal rows (`is_focal == TRUE`), the
+#' * **`dist_to_smallORFs`** - for focal rows (`is_focal == TRUE`), the
 #'   smallest positional distance within `group_key` to a small-ORF row
 #'   sharing its `centroid_80` (a small ORF derived from the same focal).
 #'   NA for non-focal rows, small-ORF rows themselves, and focals whose
@@ -85,11 +85,11 @@ library(stringr)
 #' explicitly *not* used here. Pass `group_key = "uid"` for coarse,
 #' `"uid_fine"` for fine.
 #'
-#' The focal flag column is hardcoded to `is_focal` (added to `gene_meta`
+#' The focal flag column is hardcoded to `is_focal` (added to `focal_meta`
 #' by the driver). NA values are coalesced to FALSE.
 #'
 #' For how `neighbor_c80_coarse`, `neighbor_c80_fine`, and `centroid_80` differ
-#' and when to use each, see `PIPELINE.md`.
+#' and when to use each, see `docs/PIPELINE.md`.
 #'
 #' @export
 decorate_c80s_w_smallORFs <- function(df, group_key = "uid") {
@@ -140,7 +140,7 @@ decorate_c80s_w_smallORFs <- function(df, group_key = "uid") {
 #' Flag truncated and fragmented c80s; attach per-operon metrics (fine only)
 #'
 #' Fine-only by design. Truncation compares `neighbor_gene_length` against
-#' `neighbor_c80_length_coarse` (the database centroid reference length) —
+#' `neighbor_c80_length_coarse` (the database centroid reference length) -
 #' a coarse-table equivalent would be misleading because that table's
 #' `neighbor_gene_length` is the max across isoforms (see
 #' [build_canonical_paths_c80s()]), so "shorter than cutoff" would
@@ -154,26 +154,26 @@ decorate_c80s_w_smallORFs <- function(df, group_key = "uid") {
 #' Six columns added; original columns and row order preserved.
 #'
 #' Truncation (length-based):
-#' * **`is_truncated`** — per row: `TRUE` when `neighbor_gene_length <
+#' * **`is_truncated`** - per row: `TRUE` when `neighbor_gene_length <
 #'   truncation_cutoff * neighbor_c80_length_coarse`. NA-guarded: synthetic
 #'   small ORFs (`neighbor_c80_length_coarse = NA`) auto-excluded.
-#' * **`truncate_ratio`** — per row: `neighbor_gene_length /
+#' * **`truncate_ratio`** - per row: `neighbor_gene_length /
 #'   neighbor_c80_length_coarse`, floor-truncated to 3 decimal places. NA for
 #'   rows where either length is NA (short ORFs).
-#' * **`n_truncated`** — per-isoform broadcast: `sum(is_truncated)` within
+#' * **`n_truncated`** - per-isoform broadcast: `sum(is_truncated)` within
 #'   `uid_fine`.
 #'
-#' Fragmentation (label-based — independent of truncation):
-#' * **`is_fragmented`** — per row: `TRUE` when this row's `neighbor_c80_coarse`
+#' Fragmentation (label-based - independent of truncation):
+#' * **`is_fragmented`** - per row: `TRUE` when this row's `neighbor_c80_coarse`
 #'   shows up under ≥2 distinct `neighbor_c80_fine` values within this
-#'   `uid_fine` — the same coarse cluster observed at multiple lengths in
+#'   `uid_fine` - the same coarse cluster observed at multiple lengths in
 #'   one operon (the "split-gene" signature). Synthetic small ORFs
 #'   (`neighbor_c80_coarse` starts with `_`) are excluded.
-#' * **`fragmented_c80s`** — per row: this row's `neighbor_c80_coarse` when
+#' * **`fragmented_c80s`** - per row: this row's `neighbor_c80_coarse` when
 #'   `is_fragmented = TRUE`, else `NA`. Slicing rows where this is non-NA
 #'   gives the rows that participate in fragmentation, labeled by which
 #'   coarse cluster each one belongs to.
-#' * **`n_fragmented_c80s`** — per-isoform broadcast:
+#' * **`n_fragmented_c80s`** - per-isoform broadcast:
 #'   `n_distinct(fragmented_c80s, na.rm = TRUE)` within `uid_fine`. Number
 #'   of distinct coarse clusters in this operon that are fragmented.
 #'
@@ -222,7 +222,7 @@ decorate_c80s_w_truncation <- function(df, truncation_cutoff = 0.8) {
 #' [decorate_c80s_w_smallORFs()] so `n_smallORFs` / `n_focal` /
 #' `dist_to_smallORFs` are present. All `uid`s in the input already
 #' cleared the `path_min_genomes` gate during canonical-path generation, so
-#' every surviving operon is "recurring" by definition — no extra
+#' every surviving operon is "recurring" by definition - no extra
 #' filter is applied here. Truncation is not reported at this level
 #' because the coarse `neighbor_gene_length` is the max across
 #' isoforms (see [summarize_fine_isoforms()] for truncation-aware
@@ -230,21 +230,21 @@ decorate_c80s_w_truncation <- function(df, truncation_cutoff = 0.8) {
 #'
 #' Output columns:
 #' * Carry-through identity: `uid`, `path_type`, `n_genomes`. (Other
-#'   identity columns — `joint_component_ids`, `canonical_path_id` —
+#'   identity columns - `joint_component_ids`, `canonical_path_id` -
 #'   are encoded in `uid` and recoverable by parsing or by joining to
 #'   `c_paths`.) `neighbor_genomes` is intentionally **not** carried:
-#'   genome-level traceback at this level is rarely useful — drop down
+#'   genome-level traceback at this level is rarely useful - drop down
 #'   to `summarize_fine_isoforms()` or `c_paths_per_genome` for that.
-#' * `n_genes` — number of c80 positions in the operon.
-#' * `n_focal` / `n_smallORFs` — per-operon counts inherited from
+#' * `n_genes` - number of c80 positions in the operon.
+#' * `n_focal` / `n_smallORFs` - per-operon counts inherited from
 #'   the small-ORF decoration.
-#' * `min_dist_to_smallORFs` — smallest non-NA `dist_to_smallORFs`
+#' * `min_dist_to_smallORFs` - smallest non-NA `dist_to_smallORFs`
 #'   across focal rows in the operon, integer; NA if no focal has
 #'   any associated small ORF.
-#' * `smallORF_type_combo` — sorted, comma-joined unique values of
+#' * `smallORF_type_combo` - sorted, comma-joined unique values of
 #'   `smallORF_type` across the small-ORF rows of the operon
 #'   (e.g. `"CDS,tRNA"`). NA if the operon has no small ORFs.
-#' * `coarse_path_string` — `neighbor_c80_coarse` tokens joined with
+#' * `coarse_path_string` - `neighbor_c80_coarse` tokens joined with
 #'   `" → "` in canonical direction.
 #'
 #' Sorted by `desc(n_genomes)`.
@@ -281,7 +281,7 @@ summarize_coarse_operons <- function(canonical_paths_c80s) {
 #' both [decorate_c80s_w_smallORFs()] and [decorate_c80s_w_truncation()],
 #' so `n_smallORFs` / `n_focal` / `n_truncated` / `n_fragmented_c80s` /
 #' `fragmented_c80s` are present. Rolls up per-isoform flags. No
-#' minimum-support filter is applied — every surviving isoform from
+#' minimum-support filter is applied - every surviving isoform from
 #' [expand_canonical_paths_to_fine()] is included; downstream callers
 #' can filter by `n_fine_genomes` as needed.
 #'
@@ -294,12 +294,12 @@ summarize_coarse_operons <- function(canonical_paths_c80s) {
 #'   `canonical_path_id`, `fine_canonical_id`, `isoform_rank`) are
 #'   encoded in `uid_fine` (`<uid>-iso<rank>-ngf<n_fine_genomes>`) and
 #'   recoverable by parsing or by joining to `c_paths_fine`.
-#' * `n_genes` — number of c80 positions in the isoform.
+#' * `n_genes` - number of c80 positions in the isoform.
 #' * `n_focal` / `n_smallORFs` / `n_truncated` / `n_fragmented_c80s`
-#'   — per-isoform counts inherited from the decorations.
-#' * `fragmented_c80s` — sorted comma-joined coarse cluster IDs that
+#'   - per-isoform counts inherited from the decorations.
+#' * `fragmented_c80s` - sorted comma-joined coarse cluster IDs that
 #'   are fragmented in this isoform; NA if none.
-#' * `fine_path_string` — `neighbor_c80_fine` tokens joined with
+#' * `fine_path_string` - `neighbor_c80_fine` tokens joined with
 #'   `" → "` in canonical direction.
 #'
 #' Sorted by `desc(n_fine_genomes)`. `fine_neighbor_genomes` is
@@ -329,7 +329,6 @@ summarize_fine_isoforms <- function(canonical_paths_fine_c80s) {
       fine_path_string  = paste(neighbor_c80_fine, collapse = " → "),
       .groups = "drop"
     ) %>%
-    #mutate(dominant_fraction = n_fine_genomes / n_genomes) %>%
     arrange(desc(n_fine_genomes)) %>%
     relocate(fine_neighbor_genomes, .after = last_col())
 }
@@ -350,7 +349,7 @@ summarize_fine_isoforms <- function(canonical_paths_fine_c80s) {
 #' `gene_path_canonical` (already direction-aligned by
 #' `expand_canonical_paths_per_genome` via the L2 `needs_flip` flag);
 #' `position_in_path` is the 1-indexed canonical position. The full
-#' path string is **not** kept on the output — reconstruct it on
+#' path string is **not** kept on the output - reconstruct it on
 #' demand via `arrange(position_in_path) %>% summarise(paste(gene_id,
 #' collapse = " → "))` per `(uid_fine, neighbor_genome)`.
 #'
@@ -441,7 +440,7 @@ sample_genome_from_fine_paths <- function(selected_fine, canonical_paths_per_gen
 #' `fine_long` already carries. Joining on `(uid_fine,
 #' neighbor_c80_fine)` alone would silently row-multiply if a fine
 #' path has the same coarse cluster at two positions with the same
-#' length variant — `position_in_path` disambiguates.
+#' length variant - `position_in_path` disambiguates.
 #'
 #' Three columns are excluded from the join payload to avoid
 #' colliding with `fine_long`:
@@ -452,7 +451,7 @@ sample_genome_from_fine_paths <- function(selected_fine, canonical_paths_per_gen
 #'   `fine_long` it is the per-gene observed length (from
 #'   `gene_neighbors`), while in `c80s_fine` it is the per-isoform
 #'   consensus length (from the canonical-fine builder). Same name,
-#'   different semantics — keeping both would invite confusion.
+#'   different semantics - keeping both would invite confusion.
 #'
 #' @param fine_long Output of [`sample_genome_from_fine_paths`].
 #'   Required cols: `uid_fine`, `position_in_path`.
@@ -513,12 +512,12 @@ write_blast_gene_lists <- function(sampled_long, out_dir) {
 
 
 # -----------------------------------------------------------------------------
-# Plot data-prep helpers (used by the Step 6 plotters in plot.R)
+# Plot data-prep helpers (used by the Step 5 plotters in plot.R)
 # -----------------------------------------------------------------------------
 
 #' Label c80 rows by focal-direction or anchor role
 #'
-#' Adds a `c80_label` column to a c80s frame for use by the Step 6
+#' Adds a `c80_label` column to a c80s frame for use by the Step 5
 #' plotters in `plot.R`. Focal-aware: only focal rows (`is_focal == TRUE`)
 #' get direction labels; non-focal rows on anchor canonical paths get the
 #' `"anchor"` label so they show up as the per-path frame of reference.
@@ -533,7 +532,7 @@ write_blast_gene_lists <- function(sampled_long, out_dir) {
 #' * `NA`: everything else (non-focal rows on non-anchor paths; focal
 #'   rows with `NA` `value_col`).
 #'
-#' Step 6 glyph mapping (`.layout_operon_tracks` in plot.R): `pos` -> `"U"`,
+#' Step 5 glyph mapping (`.layout_operon_tracks` in plot.R): `pos` -> `"U"`,
 #' `neg` -> `"D"`, `neu` -> `"N"`, `anchor` -> `"O"`. Coloring (`fill_gene`)
 #' is applied to `pos`/`neg`/`anchor` rows; `neu` carries the glyph but no
 #' fill.
@@ -541,10 +540,18 @@ write_blast_gene_lists <- function(sampled_long, out_dir) {
 #' @param df A c80s frame; must contain `is_focal`, `path_type`, and
 #'   the column named by `value_col`.
 #' @param value_col Name of the trait-association column to read sign
-#'   from (default `"cor_to_b"`; Step 5 passes `"beta"`).
+#'   from (default `"cor_to_b"`; Step 4 passes `"beta"`).
 #'
 #' @export
 assign_c80_label <- function(df, value_col = "cor_to_b") {
+  # No trait score - use focal_label directly if available
+  if (!value_col %in% names(df)) {
+    if ("focal_label" %in% names(df)) {
+      return(df %>% mutate(c80_label = if_else(coalesce(is_focal, FALSE), focal_label, NA_character_)))
+    }
+    return(df %>% mutate(c80_label = NA_character_))
+  }
+
   stopifnot(all(c("is_focal", "path_type", value_col) %in% names(df)))
 
   df %>%
@@ -589,17 +596,15 @@ decorate_with_updated_path_type <- function(df) {
       .groups = "drop"
     ) %>%
     mutate(
-      .pos = str_detect(c80_label_combo, "\\bpos\\b"),
-      .neg = str_detect(c80_label_combo, "\\bneg\\b"),
-      purity_status = if_else(.pos & .neg, "impure", "pure"),
+      .n_labels = str_count(c80_label_combo, ",") + 1L,
+      purity_status = if_else(.n_labels > 1L, "impure", "pure"),
       updated_path_type = case_when(
-        path_type == "anchor" &  .pos & !.neg ~ "anchor_pos",
-        path_type == "anchor" & !.pos &  .neg ~ "anchor_neg",
-        path_type == "anchor" &  .pos &  .neg ~ "anchor_mixed",
-        TRUE                                  ~ path_type
+        path_type == "anchor" & purity_status == "impure" ~ paste0("anchor_mixed"),
+        path_type == "anchor" & purity_status == "pure"   ~ paste0("anchor_", c80_label_combo),
+        TRUE                                              ~ path_type
       )
     ) %>%
-    select(-.pos, -.neg)
+    select(-.n_labels)
 
   df %>%
     left_join(per_path, by = c("joint_component_id", "canonical_path_id", "path_type")) %>%
@@ -610,9 +615,9 @@ decorate_with_updated_path_type <- function(df) {
 }
 
 
-#' Run Step 5: summaries, fine-coverage selection, exemplar sampling, BLAST gene lists
+#' Run Step 4: summaries, fine-coverage selection, exemplar sampling, BLAST gene lists
 #'
-#' Orchestrator for Step 5. Builds per-operon and per-isoform summaries,
+#' Orchestrator for Step 4. Builds per-operon and per-isoform summaries,
 #' applies the fine-coverage isoform-survival filter, attaches
 #' isoform-map columns to `coarse_summary`, samples one exemplar genome
 #' per surviving fine isoform, enriches the long-format result with
@@ -620,11 +625,11 @@ decorate_with_updated_path_type <- function(df) {
 #' gene-id TSVs for the external BLAST workflow.
 #'
 #' Inputs are passed in explicitly so the caller (pipeline.R) is the one
-#' place that loads the three Step 3 TSVs from disk; this keeps Step 5
+#' place that loads the three Step 3 TSVs from disk; this keeps Step 4
 #' re-runnable in isolation while making the call-site signature
-#' self-documenting. The plotting block lives in [run_step6_figures()]
+#' self-documenting. The plotting block lives in [run_step5_figures()]
 #' (plot.R) so a re-render after editing `fill_modes` does not require
-#' re-running the rest of Step 5.
+#' re-running the rest of Step 4.
 #'
 #' Reads `path_min_genomes`, `fine_coverage_ratio`, and `seed` from
 #' `job_config` via `cfg_get`. Writes five TSVs via `get_target`:
@@ -649,7 +654,7 @@ decorate_with_updated_path_type <- function(df) {
 #'   disk only.
 #'
 #' @export
-run_step5_parse <- function(c80s_coarse, c80s_fine, per_genome, gene_neighbors) {
+run_step4_parse <- function(c80s_coarse, c80s_fine, per_genome, gene_neighbors) {
   # 1. Summaries
   coarse_summary <- summarize_coarse_operons(c80s_coarse)
   fine_summary <- summarize_fine_isoforms(c80s_fine)

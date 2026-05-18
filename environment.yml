@@ -46,9 +46,13 @@ dependencies:
   # System tools (if needed)
   - pandoc>=2.19
 
-  # Optional: Python tools for workflow management
+  # Python tools — required by Step 0a (build_genome_catalog.py +
+  # gff_to_genes.py). pyyaml parses <config.yaml>; gffutils backs the Prokka
+  # GFF3 -> .genes conversion.
   - python>=3.10
   - pip
+  - pyyaml>=6.0
+  - gffutils>=0.14
 
   # R packages not available in conda (install via pip or R)
   # These will need to be installed separately:

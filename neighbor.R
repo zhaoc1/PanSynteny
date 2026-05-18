@@ -276,7 +276,7 @@ orient_focal_gene_neighbors <- function(gene_neighbors, focal_min_genomes) {
     mutate(relative_position = relative_position * orientation) %>%
     arrange(gene_member, relative_position)
   
-  out <- out %>% mutate(group_excludeNA = as.integer(factor(canonical_path))) #<- could rename to oriented_path_id
+  out <- out %>% mutate(group_excludeNA = as.integer(factor(canonical_path)))
   
   out <- out %>% group_by(group_excludeNA) %>% filter(n_distinct(gene_member) >= focal_min_genomes) %>% ungroup()
   out
@@ -306,9 +306,9 @@ orient_focal_gene_neighbors <- function(gene_neighbors, focal_min_genomes) {
 #' \itemize{
 #'   \item **Two resolution levels** exist throughout:
 #'     \itemize{
-#'       \item `group_excludeNA` — the *broad* orientation group (set upstream
+#'       \item `group_excludeNA` - the *broad* orientation group (set upstream
 #'         by [orient_focal_gene_neighbors()]), NA-agnostic.
-#'       \item `group_includeNA` — the *detailed* pattern within a broad group,
+#'       \item `group_includeNA` - the *detailed* pattern within a broad group,
 #'         distinguishing unannotated genes by length.
 #'     }
 #'     Only the dominant detailed pattern within each broad group survives.
@@ -477,6 +477,8 @@ parse_gene_neighbor <- function(in_fp, focal_c80, gene_to_c80) {
 
   focal_min_genomes <- cfg_get(job_config, "focal_min_genomes")
   focal_min_total_genomes <- cfg_get(job_config, "focal_min_total_genomes")
+  # `min_positions` doubles as the minimum operon size cut downstream
+  # (compute_relative_positions / compute_operon_size).
   min_operon_size <- cfg_get(job_config, "min_positions")
   upper_bound <- cfg_get(job_config, "upper_bound")
   min_left_neighbors <- cfg_get(job_config, "min_left_neighbors")
@@ -753,7 +755,7 @@ load_neighbors_across_genomes <- function(input_dir, mc_cores = NULL) {
 }
 
 
-#' Run Step 1 — per-focal neighborhood extraction + label attachment
+#' Run Step 1 - per-focal neighborhood extraction + label attachment
 #'
 #' Orchestrator for Step 1. Three sub-stages, all gated on the existence
 #' of the cached `neighbor_groups_rds`:
@@ -784,12 +786,12 @@ load_neighbors_across_genomes <- function(input_dir, mc_cores = NULL) {
 #'   (from [load_c80_tables()] in midas.R).
 #'
 #' @return A list with three named entries:
-#'   * `gene_neighbors` — unified neighbor table (per focal, per
+#'   * `gene_neighbors` - unified neighbor table (per focal, per
 #'     genome, per neighbor position) with both `neighbor_c80_coarse`
 #'     and `neighbor_c80_fine` populated.
-#'   * `short_gene_prevalence` — per-synthetic-c80 prevalence map for
+#'   * `short_gene_prevalence` - per-synthetic-c80 prevalence map for
 #'     unannotated short ORFs.
-#'   * `c80_variants_mapping` — `(neighbor_c80_coarse,
+#'   * `c80_variants_mapping` - `(neighbor_c80_coarse,
 #'     neighbor_gene_length) -> neighbor_c80_fine` mapping.
 #'
 #' @export
@@ -798,8 +800,8 @@ run_step1_neighbor_extraction <- function(focal_c80_df, gene_to_c80) {
   if (file.exists(gene_neighbors_rds)) {
     return(list(
       gene_neighbors = readRDS(get_target("neighbor_groups_rds")),
-      short_gene_prevalence = readRDS(get_target("short_gene_prevalence")),
-      c80_variants_mapping = readRDS(get_target("c80_variants_mapping"))
+      short_gene_prevalence = readr::read_delim(get_target("short_gene_prevalence"), delim = "\t", show_col_types = FALSE),
+      c80_variants_mapping = readr::read_delim(get_target("c80_variants_mapping"), delim = "\t", show_col_types = FALSE)
     ))
   }
 
@@ -817,8 +819,8 @@ run_step1_neighbor_extraction <- function(focal_c80_df, gene_to_c80) {
     select(focal_c80:neighbor_c80_coarse, neighbor_c80_length_coarse, neighbor_c80_fine, neighbor_gene_length, everything())
 
   saveRDS(gene_neighbors, get_target("neighbor_groups_rds"))
-  saveRDS(short_gene_prevalence, get_target("short_gene_prevalence"))
-  saveRDS(c80_variants_mapping, get_target("c80_variants_mapping"))
+  readr::write_delim(short_gene_prevalence, get_target("short_gene_prevalence"), delim = "\t")
+  readr::write_delim(c80_variants_mapping, get_target("c80_variants_mapping"), delim = "\t")
 
   list(
     gene_neighbors = gene_neighbors,

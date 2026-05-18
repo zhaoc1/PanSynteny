@@ -10,14 +10,48 @@
 
 load_job_config <- function(yaml_path) {
   stopifnot(file.exists(yaml_path))
-  
+
   if (!exists("job_config", envir = .GlobalEnv)) {
     assign("job_config", new.env(), envir = .GlobalEnv)
   }
   raw <- yaml::read_yaml(yaml_path)
 
-  # species-scope proj_dir and ensure it exists
-  raw$job$proj_dir <- file.path(raw$job$proj_dir, raw$job$species_id)
+  # Expand `{proj_dir}`, `{species_id}`, `{midasdb_dir}`, `{input_dir}`
+  # placeholders in every string scalar in the YAML (recursively). Lets users
+  # shorten repetitive paths in the config -
+  # `data.focal_meta: "{input_dir}/focal_table.tsv"` instead of the full path.
+  # `{input_dir}` keeps user-provided inputs separate from `{proj_dir}`
+  # (the output root). Mirrors the placeholder system `build_genome_catalog`
+  # uses for `sources:`.
+  # input_dir + parallel_jobs are required under job: (no backward-compat fallbacks).
+  if (is.null(raw$job$input_dir) || !is.character(raw$job$input_dir) || !nzchar(raw$job$input_dir)) {
+    stop("job.input_dir is required in <config.yaml>. Add the absolute path to your user-provided inputs (focal_meta TSV, etc.) under job:.")
+  }
+  if (is.null(raw$job$parallel_jobs)) {
+    stop("job.parallel_jobs is required in <config.yaml>. Add an integer (typical: 2) under job: to control run_species.sh's xargs -P fan-out.")
+  }
+
+  replacements <- c(
+    "{proj_dir}"    = raw$job$proj_dir,
+    "{species_id}"  = raw$job$species_id,
+    "{midasdb_dir}" = if (!is.null(raw$data$midasdb_dir)) raw$data$midasdb_dir else "",
+    "{input_dir}"   = raw$job$input_dir
+  )
+  expand_placeholders <- function(x) {
+    if (is.character(x) && length(x) == 1) {
+      for (ph in names(replacements)) x <- gsub(ph, replacements[[ph]], x, fixed = TRUE)
+      x
+    } else if (is.list(x)) {
+      lapply(x, expand_placeholders)
+    } else {
+      x
+    }
+  }
+  raw <- expand_placeholders(raw)
+
+  # Ensure proj_dir exists. `proj_dir` is used as-is (no implicit species_id
+  # suffix); if you want per-species isolation, include the species in the
+  # YAML, e.g. `proj_dir: "/path/to/results/102506"`.
   dir.create(raw$job$proj_dir, showWarnings = FALSE, recursive = TRUE)
 
   # Flatten sections into job_config (single flat namespace)

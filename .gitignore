@@ -7,3 +7,8 @@
 archive/
 *html
 .positai
+parked/
+examples/
+__pycache__/
+*.pyc
+.claude/

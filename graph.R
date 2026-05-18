@@ -5,7 +5,7 @@
 # 
 # Author:  Chunyu Zhao <chunyu.zhao@gladstone.ucsf.edu>
 # Created: 2025-07-14
-# Updated: 2026-04-28; 2025-10-10
+# Updated: 2026-04-28
 # ------------------------------------------------------------------------------
 
 library(dplyr)
@@ -133,7 +133,7 @@ get_edges_from_paths <- function(df, edge_type) {
 #' Enumerate maximal source-to-sink paths for one edge type
 #'
 #' Build a directed graph from `edges`, restrict to edges of a single
-#' `edge_type`, and return every maximal path — i.e., every path from an
+#' `edge_type`, and return every maximal path - i.e., every path from an
 #' in-degree-0 node (source) to an out-degree-0 node (sink). Within a DAG
 #' these are exactly the paths that cannot be extended at either end, so the
 #' output captures all complete operon chains observed at this edge type.
@@ -180,7 +180,7 @@ get_maximal_paths_by_type <- function(edges, edge_type = "pos") {
   # introduce a back-edge from a later position to an earlier one. A cycle here
   # therefore signals a real upstream problem (e.g., a tandem A → B → A in
   # chromosomal order, or a corrupted neighbor TSV) and we hard-stop rather
-  # than silently producing nonsense paths — DFS path enumeration has no
+  # than silently producing nonsense paths - DFS path enumeration has no
   # principled way to break cycles.
   if (!is_dag(g)) stop("Graph must be a DAG.")
   
@@ -241,7 +241,7 @@ get_maximal_paths_by_type <- function(edges, edge_type = "pos") {
 #' adjacency graph from the positional neighbor data, aggregate per-edge
 #' support across all operons in that genome, and enumerate every maximal
 #' source-to-sink path through the graph. Results from all genomes are
-#' concatenated into two tables — one of paths, one of per-edge support —
+#' concatenated into two tables - one of paths, one of per-edge support -
 #' with node IDs translated into cluster labels at both coarse (cluster-level,
 #' `neighbor_c80_coarse`) and fine (length-variant, `neighbor_c80_fine`) resolution.
 #'
@@ -255,7 +255,7 @@ get_maximal_paths_by_type <- function(edges, edge_type = "pos") {
 #' treat length variants of the same cluster as distinct (e.g., truncated vs.
 #' full-length copies) or collapse them. Keeping both `c80_path_coarse`
 #' (coarse) and `c80_path_fine` (fine) in parallel columns means no
-#' downstream code has to re-derive either mapping — each consumer picks the
+#' downstream code has to re-derive either mapping - each consumer picks the
 #' resolution that fits the question.
 #'
 #' **Per-genome scope.** Edges and paths are computed within each genome
@@ -402,7 +402,7 @@ max_overlap <- function(a, b) {
 #'
 #' @details
 #' **Collapse key is the raw coarse string.** Grouping is on
-#' `c80_path_coarse` verbatim — no direction canonicalization is applied
+#' `c80_path_coarse` verbatim - no direction canonicalization is applied
 #' here. Because Step 2 sorts by chromosomal `neighbor_gene_start` and
 #' discards Step 1's per-focal orientation, two genomes carrying the same
 #' operon on opposite strands emit mirror-image strings
@@ -413,7 +413,7 @@ max_overlap <- function(a, b) {
 #'
 #' **Resolution.** Collapse is on `c80_path_coarse` (coarse cluster-level
 #' labels). The length-variant `c80_path_fine` column, if present,
-#' is not used and is not propagated downstream of this function — length
+#' is not used and is not propagated downstream of this function - length
 #' variants of the same coarse cluster string therefore collapse here.
 #'
 #' **`path_length` in the grouping is redundant** (fully implied by
@@ -458,7 +458,7 @@ clean_for_orientation <- function(tokens) {
 #' and return the chosen direction applied to the **full** original tokens.
 #'
 #' **Orientation-only contract.** This function only ever returns either
-#' `forward_full` or `reverse_full` of the input — it never reorders tokens
+#' `forward_full` or `reverse_full` of the input - it never reorders tokens
 #' within a direction, never drops tokens from the stored output, and never
 #' changes token content. Downstream callers
 #' ([explode_canonical_into_collapsed_paths()] and the per-isoform / per-
@@ -508,7 +508,7 @@ split_path_string <- function(path_str) {
 #' **Mixed-type sanity check.** The function warns if any `canonical_path_id`
 #' spans more than one `type` value (e.g., a `pos` path whose reverse was
 #' recorded as `neg`). The diagnostic data frame inside the `if` block is
-#' built but not assigned or printed — only the `warning()` surfaces.
+#' built but not assigned or printed - only the `warning()` surfaces.
 #' Execution continues; if the invariant is actually violated, the
 #' subsequent `summarise(type = unique(type))` aborts with a length-mismatch
 #' error rather than with the warned groups.
@@ -530,8 +530,8 @@ split_path_string <- function(path_str) {
 #'
 #' **Scope vs. [orient_paths_within_component()].** This function provides
 #' *identity* canonicalization only (one surrogate per path+reverse pair).
-#' Consistent orientation *within a joint component* — so that paths sharing
-#' a subpath align left-to-right — is the job of
+#' Consistent orientation *within a joint component* - so that paths sharing
+#' a subpath align left-to-right - is the job of
 #' [orient_paths_within_component()] and is applied later.
 #'
 #' @export
@@ -572,7 +572,7 @@ generate_canonical_path <- function(collapsed_paths, path_min_genomes) {
 #' every edge type, with direction and type information discarded) and
 #' compute its connected components. Each component is a maximal set of
 #' `centroid_80` gene nodes that are transitively linked by observed
-#' adjacency anywhere in the corpus — a candidate "genomic locus identity"
+#' adjacency anywhere in the corpus - a candidate "genomic locus identity"
 #' that unifies all canonical-path variants touching that gene neighborhood.
 #'
 #' This scaffold is the grouping scope for downstream operations:
@@ -603,7 +603,7 @@ generate_canonical_path <- function(collapsed_paths, path_min_genomes) {
 #'
 #' **Resolution is coarse.** Nodes are the `centroid_80` cluster labels
 #' embedded in `c80_path_coarse_canonical`. Length-variant `c80_path_fine`
-#' information is not considered here — length isoforms always co-compose
+#' information is not considered here - length isoforms always co-compose
 #' with their parent cluster.
 #'
 #' **Hub-gene merging risk.** A c80 gene that participates in many
@@ -630,7 +630,7 @@ compute_joint_components <- function(canonical_paths, edge_types = c("pos", "neg
   joint_edges <- combined_edges %>% select(from, to) %>% distinct()
   
   # build un-directed graph
-  joint_graph <- igraph::graph_from_data_frame(joint_edges, directed = FALSE) #<----- NOTE
+  joint_graph <- igraph::graph_from_data_frame(joint_edges, directed = FALSE)
   
   # Compute connected components
   joint_comps <- components(joint_graph, mode = "weak")$membership
@@ -673,7 +673,7 @@ compute_joint_components <- function(canonical_paths, edge_types = c("pos", "neg
 #' before building the undirected graph. The opposite happens: a shared
 #' node fuses every operon it touches into one component, so all paths
 #' through it inherit the same single id. The string stays single-valued,
-#' but the value can label a much larger blob than any one operon — see
+#' but the value can label a much larger blob than any one operon - see
 #' the megacomponent caveat in [compute_joint_components()].
 #'
 #' @export
@@ -723,7 +723,7 @@ decorate_paths_with_components <- function(canonical_paths, joint_component_map)
 #'   \item Target shares zero tokens with the reference (peripheral
 #'     path; reaches the reference only transitively through other
 #'     paths in the same component).
-#'   \item Target shares only one token with the reference — a
+#'   \item Target shares only one token with the reference - a
 #'     single token matches itself in either direction.
 #' }
 #' Empty cleaned vectors short-circuit to `FALSE`.
@@ -745,7 +745,7 @@ should_flip <- function(reference, target) {
 #' Decide-and-apply wrapper around [should_flip()]: when the query
 #' should be flipped to align with the reference, return the reversed
 #' query; otherwise return the query unchanged. The flip is applied
-#' to the **full** query token vector — synthetic ORFs and adjacent
+#' to the **full** query token vector - synthetic ORFs and adjacent
 #' duplicates survive in the returned data even though they did not
 #' drive the decision (cleaning happens inside `should_flip` for the
 #' decision only).
@@ -767,7 +767,7 @@ collapse_path <- function(gene_list) paste(gene_list, collapse = " → ")
 #' orientation that maximizes its contiguous-substring overlap against the
 #' reference. The result is a set of canonical paths that, within a
 #' component, all read left-to-right in a mutually consistent chromosomal
-#' direction — which is what downstream visualization, sub-pattern
+#' direction - which is what downstream visualization, sub-pattern
 #' detection, and focal-block analysis assume.
 #'
 #' This function does **not** aim for a globally meaningful direction: the
@@ -777,7 +777,7 @@ collapse_path <- function(gene_list) paste(gene_list, collapse = " → ")
 #'
 #' **Orientation-only contract.** Like [normalize_path()], this function only
 #' ever picks between `forward` and `rev(forward)` of each path's token
-#' vector — never reorders tokens within a direction or changes token
+#' vector - never reorders tokens within a direction or changes token
 #' content. Downstream callers
 #' ([explode_canonical_into_collapsed_paths()] and the per-isoform / per-
 #' genome expansion functions in path.R) rely on this so the
@@ -806,7 +806,7 @@ collapse_path <- function(gene_list) paste(gene_list, collapse = " → ")
 #'     paths share the maximum length and point in opposite directions, the
 #'     chosen reference depends on input row order. A different reference
 #'     produces a whole-component mirror flip. Correctness within the
-#'     component is unaffected — only the absolute direction differs across
+#'     component is unaffected - only the absolute direction differs across
 #'     runs.}
 #'   \item{Zero overlap between query and reference}{A peripheral path that
 #'     connects to the reference only transitively (through an intermediate
@@ -856,7 +856,7 @@ orient_paths_within_component <- function(dd) {
 }
 
 
-#' Run Step 2 — per-genome path stitching
+#' Run Step 2 - per-genome path stitching
 #'
 #' Orchestrator for Step 2. Calls [stitch_paths_across_focal_genes()] to
 #' build per-genome maximal paths from `gene_neighbors`, derives the
@@ -870,15 +870,15 @@ orient_paths_within_component <- function(dd) {
 #' build/save block is skipped and the cached frame is returned. To force
 #' a re-run, delete the file at `get_target("path_df")`.
 #'
-#' @param gene_neighbors Output of Step 1 — one row per (focal, genome,
+#' @param gene_neighbors Output of Step 1 - one row per (focal, genome,
 #'   neighbor position), with `neighbor_c80_coarse` and
 #'   `neighbor_c80_fine` populated.
 #'
-#' @return The `path_df` frame (one row per per-genome maximal path),
-#'   read back from disk so the same code path runs in both cache-hit
-#'   and cache-miss cases. The companion `esupport_df` is persisted but
-#'   not returned (Step 3 does not consume it; ad-hoc inspection can
-#'   `readRDS(get_target("esupport_df"))`).
+#' @return The `path_df` frame (one row per per-genome maximal path).
+#'   On cache hit, returned from `readRDS`; on cache miss, returned in
+#'   memory after `saveRDS`. The companion `esupport_df` is persisted
+#'   but not returned (Step 3 does not consume it; ad-hoc inspection
+#'   can `readRDS(get_target("esupport_df"))`).
 #'
 #' @export
 run_step2_path_stitching <- function(gene_neighbors) {

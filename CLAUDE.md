@@ -8,9 +8,9 @@ Six things that aren't obvious from skimming the code:
 
 1. **The graph is internal plumbing, not output.** Users receive operon TSVs and gggenes PDFs. The graph layer (igraph, DFS, joint components) lives entirely inside Step 2 / Step 3 and dies before Step 4. Frame any user-facing description around operons, not graphs.
 
-2. **`proj_dir` is used as-is** (no implicit `species_id` suffix). If you want per-species isolation, include the species in the YAML value, e.g. `proj_dir: "/path/.../<species_id>"`. Multi-trait or multi-species runs that share the same `proj_dir` will clobber each other; treat one `proj_dir` per run as the rule.
+2. **`proj_dir` is used as-is** — no implicit `species_id` suffix any more. If you want per-species isolation, include the species in the YAML value, e.g. `proj_dir: "/path/.../<species_id>"`. Multi-trait or multi-species runs that share the same `proj_dir` will clobber each other; treat one `proj_dir` per run as the rule. (This changed in v0.2.0 — v0.1.0 silently appended `species_id` inside `config.R`.)
 
-3. **YAML sections are cosmetic.** `cfg_get` flattens every section into one namespace; section placement is for human readability only. Two keys with the same name across sections would shadow each other silently. **Exception:** `sources:` is a list (not a scalar section) — `config.R`'s flatten loop skips it entirely. It is consumed only by `build_genome_catalog.py`.
+3. **YAML sections are cosmetic.** `cfg_get` flattens every scalar YAML section into one namespace; section placement is for human readability only. Two keys with the same name across sections would shadow each other silently. **Exception:** `sources:` is a list (not a scalar section) — `config.R`'s flatten loop skips it entirely. It is consumed only by `build_genome_catalog.py`.
 
 4. **Two `focal_meta` namespaces.** `cfg_get(job_config, "focal_meta")` returns the **YAML-declared input path** (the user's raw focal table, anywhere on disk). `get_target("focal_meta")` returns the **step1 cache target** (`step1_setup/gene_meta_full.tsv` — filename kept for backward compatibility). `prepare.R` reads the first, optionally applies thresholds, and writes the second. `pipeline.R` only sees the cache.
 
@@ -43,7 +43,7 @@ Rscript pipeline.R              <config.yaml>
 
 Working example config: [example.yaml](example.yaml). A real worked-example input bundle (config + focal_meta TSV) lives under [examples/](examples/). `prepare.R` is cheap to re-run (always overwrites the focal_meta cache, the run_config.yaml snapshot, and gene_list.tsv). `pipeline.R` aborts at startup if the focal_meta cache is missing or any `is_focal == TRUE` centroid lacks its neighbor TSV under `neighbor_list/` — both errors point back to `prepare.R`.
 
-**Per-focal neighbor TSVs are now materialised in-repo.** `run_species.sh` consumes `gene_list.tsv` (the missing-list `prepare.R` writes) and fans `generate_neighbor_list.sh` over each focal; per-focal idempotency lives in that script. There is no longer an external preprocessing job to coordinate.
+**Per-focal neighbor TSVs are now materialised in-repo.** `run_species.sh` consumes `gene_list.tsv` (the missing-list `prepare.R` writes) and fans `generate_neighbor_list.sh` over each focal; per-focal idempotency lives in that script. There is no longer an external preprocessing job to coordinate (v0.1.0 required one).
 
 **Re-run skipping by cache.** Step 1 skips re-extraction if `step2_neighbors/neighbor_groups.RDS` exists; Step 2 skips if `step3_path/path_df.rds` exists. **To force a step to re-run, delete its cache file.**
 
@@ -53,7 +53,7 @@ There is no test suite, no Makefile, no lint config. To smoke-test that a single
 Rscript -e 'invisible(parse(file = "graph.R")); cat("OK\n")'
 ```
 
-Setup details (conda env, R packages, troubleshooting) live in [SETUP.md](docs/SETUP.md).
+Setup details (conda env, R + Python packages, troubleshooting) live in [SETUP.md](docs/SETUP.md).
 
 ## Architecture
 
@@ -72,8 +72,10 @@ Single R script per pipeline stage; `pipeline.R` is the linear driver and reads 
 | [graph.R](graph.R) | Step 2: per-genome graphs → maximal paths. Step 3: canonicalization, joint components, orientation. |
 | [path.R](path.R) | Step 3: canonical → fine → per-genome expansions. |
 | [parse.R](parse.R) | Step 3 c80s decorators (small-ORF, truncation/fragmentation). Step 4 orchestrator. |
-| [blocks.R](blocks.R) | Step 6: trait-associated block extraction + representative ranking. |
 | [plot.R](plot.R) | Step 5: gggenes plotters (global + per-component). Plus Step 1 diagnostic plots. |
+| [blocks.R](blocks.R) | Step 6: trait-associated block extraction + representative ranking. |
+
+Note the v0.2.0 step renumbering vs v0.1.0: parse was Step 5 → now Step 4; figures was Step 6 → now Step 5; block extraction was Step 4 → now Step 6 (and is now skippable; see gotchas).
 
 ### Step 0a — genome catalog build
 
@@ -112,9 +114,9 @@ pipeline.R Step 1    per-focal neighbor TSVs + catalog c80 tables
            Step 2    gene_neighbors            -->  path_df (one row per per-genome maximal path, RDS cache)
            Step 3    path_df                   -->  canonical_paths (L1) / canonical_paths_fine (L2) / canonical_paths_per_genome (L3)
                                                  + canonical_paths_c80s (L1 per-gene) / canonical_paths_fine_c80s (L2 per-gene)
-           Step 6    canonical_paths_c80s      -->  representative_path.tsv + rep.tsv (block reps × genome)
            Step 4    L1/L2/L3 c80s + per-gen   -->  selected_coarse / selected_fine / fine_long + per-(uid_fine,genome) BLAST gene-id TSVs
            Step 5    selected_* + c80s tables  -->  gggenes PDFs (global + per-component, one per fill_mode)
+           Step 6    canonical_paths_c80s      -->  representative_path.tsv + rep.tsv (block reps × genome)
 ```
 
 All R outputs land under `<proj_dir>/{step1_setup, step2_neighbors, step3_path, step4_parse, step5_figures, step6_blocks}/` — this now includes the genome catalog (`step1_setup/catalog_{genes_info,genome_toc}.tsv`), so per-run isolation is the default. Per-focal neighbor TSVs stay under `{data_dir}/{species_id}/list_of_neighbors/` (species-shared across proj_dirs). Layout is fixed by `target_layout()` in [model.R](model.R) — **always go through `get_target("key")` rather than constructing paths inline.**
@@ -194,7 +196,7 @@ Landmines that have caught people. Read before changing anything in these areas.
 
 - **`blocks.skip_block` short-circuits Step 6 (block extraction).** Setting `blocks.skip_block: true` makes pipeline.R skip the `run_step6_blocks` call entirely. Steps 4 (parse) and 5 (figures) do not depend on block-extraction outputs and proceed unchanged. Nothing is written under `step6_blocks/` in that case.
 
-- **Step 5 `fill_modes` is column-tolerant.** `run_step5_figures` (figures) filters `fill_modes` to drop any mode whose backing column is missing from the c80s tables (warning printed). Listing `beta` / `cor_to_b` / `sample_prevalence` on a minimal focal_meta is harmless — they just no-op. The minimal set that always works: `fill_gene` (derived) and any column that's in the c80s tables.
+- **Step 5 `fill_modes` is column-tolerant.** `run_step5_figures` filters `fill_modes` to drop any mode whose backing column is missing from the c80s tables (warning printed). Listing `beta` / `cor_to_b` / `sample_prevalence` on a minimal focal_meta is harmless — they just no-op. The minimal set that always works: `fill_gene` (derived) and any column that's in the c80s tables.
 
 - **Catalog `genes_info.tsv` has a header.** Awk consumers must `FNR==1 { next }`. `generate_neighbor_list.sh` already does; if you add a new awk reader, replicate it.
 

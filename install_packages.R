@@ -24,6 +24,7 @@ packages <- c(
   "RColorBrewer",
   "scales",
   "gridExtra",
+  "pheatmap",     # Step 6 block heatmap (pipeline.R loads it unconditionally)
   "ggraph",
   "gggenes",      # Gene arrow diagrams
 

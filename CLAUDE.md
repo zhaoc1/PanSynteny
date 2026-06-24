@@ -18,7 +18,7 @@ Six things that aren't obvious from skimming the code:
 
 6. **`focal_min_genomes` ≠ `path_min_genomes`** despite sounding interchangeable. Step 1 cut on per-focal pattern recurrence; Step 3+5 cut on per-canonical-operon recurrence. Different scopes; usually but not necessarily the same value.
 
-**Project status.** v0.2.0 testing release published to `github.com/zhaoc1/pangenome-operons` (private). Schema may shift between 0.x.y versions before 1.0.
+**Project status.** v0.2.0 testing release published to `github.com/zhaoc1/PanSynteny` (private). Schema may shift between 0.x.y versions before 1.0.
 
 ## Run commands
 

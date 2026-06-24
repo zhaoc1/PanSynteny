@@ -1,6 +1,6 @@
-# pangenome-operons
+# PanSynteny: de novo discovery of recurrent syntenic gene neighborhoods across bacterial pangenomes
 
-> Strain-resolved operon catalogs from microbial pan-genome data.
+> PanSynteny is a pangenome-based framework for de novo discovery of recurrent syntenic gene neighborhoods. Starting from user-defined focal genes, PanSynteny extracts local genomic neighborhoods, canonicalizes orientation, collapses recurring gene-cluster paths across genomes, and reports conserved co-localized neighborhood blocks with genome-level traceability.
 
 **Status:** Testing release v0.2.0. Prototype — the YAML schema and output column set may change between 0.x.y versions. Not yet for production.
 

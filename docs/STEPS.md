@@ -80,7 +80,7 @@ None directly; `sources:` declares everything. `length_col` defaults to 8 (UHGG 
 
 - `data.focal_meta` (YAML scalar) — absolute path to a user-provided TSV.
   - **Minimum required columns** (all four): `focal_c80`, `focal_label`, `is_focal`, `gene_label`. (`gene_label` is your user-defined annotation/category — distinct from the `.genes`-file `gene_type` which is the GFF feature type.)
-  - **Optional, consumed when present**: `cor_to_b`, `beta`, `sample_prevalence`, `trait`, `genome_counts`. Step 5's `fill_modes` for the corresponding mode is skipped (with a warning) if its backing column is absent. Step 6 (block extraction) is gated by `blocks.skip`.
+  - **Optional, consumed when present**: `cor_to_b`, `beta`, `sample_prevalence`, `trait`, `genome_counts`. Step 5's `fill_modes` for the corresponding mode is skipped (with a warning) if its backing column is absent. Step 6 (block extraction) is gated by `blocks.skip_block`.
   - **If `prepare.score_col` is set**, the column it names (e.g. `cor_to_b`) must be present — prepare.R applies the `|score_col|` thresholds and **overwrites `is_focal`** with a warning (use `prepare.score_col: ""` to preserve a hand-curated `is_focal`, e.g. when the meta carries context rows with `is_focal = FALSE` that should not drive Step 1 extraction).
 - `{proj_dir}/step1_setup/catalog_{genes_info,genome_toc}.tsv` from Step 0a (consumed by `run_species.sh` via `generate_neighbor_list.sh`, and by `load_c80_tables` in pipeline.R).
 
@@ -438,7 +438,7 @@ The fine plots order tracks so isoforms of the same coarse `uid` are adjacent; t
 Five stages, all keyed on `(joint_component_id, path_type)`:
 
 **1. [`keep_focal_blocks()`](../blocks.R#L50)** (called inside `aggregate_blocks`)
-Within each `(joint_component_id, canonical_path_id, path_type)` group, walk rows in their existing per-path order. Tag each as a focal hit (`is_focal == TRUE`, gated separately on `value_col`) or non-hit. Cluster adjacent hits into blocks: a new block starts when more than `allow_gaps` non-hit rows intervene (gap rule: `gaps > allow_gaps + 1`). Drop non-hit rows. Sign (`+` / `−` `is_label`) is recorded but does **not** split blocks — a block can mix signs if they're close enough.
+Within each `(joint_component_id, canonical_path_id, path_type)` group, walk rows in their existing per-path order. Tag each as a focal hit (`is_focal == TRUE`) or non-hit. Cluster adjacent hits into blocks: a new block starts when more than `allow_gaps` non-hit rows intervene (gap rule: `gaps > allow_gaps + 1`). Drop non-hit rows. Sign (`+` / `−` `is_label`) is recorded but does **not** split blocks — a block can mix signs if they're close enough.
 
 **2. [`aggregate_blocks()`](../blocks.R#L96)**
 For each block, dedup consecutive duplicate c80 tokens (`A A B B C → A B C` via [`dedup_consecutive_vec`](../blocks.R#L382)) and emit `block_c80s_path` (`→`-joined), `n_genes`, `left_orig` / `right_orig` endpoints, `edge_pair`, and the singleton flag. Then aggregate at `(joint_component_id, path_type, edge_pair, block_c80s_path)`: `block_n_paths` = number of canonical paths supporting this block shape, `block_n_genomes` = sum of `n_genomes` across them, and parallel `canonical_paths` / `canonical_uids` lists. Per-component frequency: `block_freq = block_n_genomes / block_total`.
@@ -465,8 +465,6 @@ From `blocks`:
 - `allow_gaps` (default 2) — passed to `aggregate_blocks` (and through to `keep_focal_blocks`)
 - `min_overlap` (default 1) — passed to `rank_block_representatives` (and through to `get_relation`)
 - `min_shared` (default 2) — passed to `diagnose_rep_overlaps`; diagnostic-only
-
-Still hardcoded in the driver: `value_col = "beta"` for `aggregate_blocks`.
 
 ### Known caveats
 

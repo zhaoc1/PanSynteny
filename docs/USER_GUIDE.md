@@ -14,7 +14,7 @@ The output is three things:
 2. **Trait-associated blocks**: the non-redundant runs of trait-correlated genes within those operons, ranked per locus.
 3. **Per-genome attribution**: which strains carry which operon variant and which trait block.
 
-The driver is [`pipeline.R`](../pipeline.R). Steps 1–4 produce the analytical outputs (summaries, selection sets, BLAST gene lists). Step 5 renders gggenes figures (`run_step5_figures`). Step 6 extracts trait-associated blocks (`run_step6_blocks`, gated by `blocks.skip`).
+The driver is [`pipeline.R`](../pipeline.R). Steps 1–4 produce the analytical outputs (summaries, selection sets, BLAST gene lists). Step 5 renders gggenes figures (`run_step5_figures`). Step 6 extracts trait-associated blocks (`run_step6_blocks`, gated by `blocks.skip_block`).
 
 ---
 
@@ -421,7 +421,7 @@ Downstream, **delete the Step 1 cache** (`step2_neighbors/neighbor_groups.RDS`) 
 | **3** | Cross-genome consolidation → three granularity levels with trait stats and structural flags. Orchestrated by [`run_step3_consolidation`](../path.R). | `pipeline.R` lines 103–128 | `graph.R`, `path.R`, `parse.R` | `step3_path/canonical_paths*.tsv` (5 TSVs) |
 | **4** | Summaries, fine-coverage selection, exemplar-genome sampling, BLAST gene lists. Orchestrated by [`run_step4_parse`](../parse.R). | `pipeline.R` | `parse.R` | `step4_parse/*` |
 | **5** | gggenes figures: global + per-component PDFs for each fill mode. Orchestrated by [`run_step5_figures`](../plot.R). | `pipeline.R` | `plot.R` | `step5_figures/*` |
-| **6** | Trait-associated block extraction + non-redundant representative ranking + per-genome attribution. Gated by `blocks.skip`. Orchestrated by [`run_step6_blocks`](../blocks.R). | `pipeline.R` | `blocks.R` | `step6_blocks/{representative_path.tsv, rep.tsv, rep_heatmap.pdf}` |
+| **6** | Trait-associated block extraction + non-redundant representative ranking + per-genome attribution. Gated by `blocks.skip_block`. Orchestrated by [`run_step6_blocks`](../blocks.R). | `pipeline.R` | `blocks.R` | `step6_blocks/{representative_path.tsv, rep.tsv, rep_heatmap.pdf}` |
 
 For each numbered step, [STEPS.md](STEPS.md) gives a complete input / output / logic / caveats writeup.
 

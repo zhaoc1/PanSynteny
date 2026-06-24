@@ -80,7 +80,7 @@ plot.gene_padding_bp ────────►│  one PDF per fill mode  │
                               └────────────┬────────────┘
                                            ▼
                               ┌─────────────────────────┐
-blocks.skip ─────────────────►│  blocks.R    (Step 6)   │  (gated)
+blocks.skip_block ───────────►│  blocks.R    (Step 6)   │  (gated)
 blocks.allow_gaps ───────────►│  trait-block extraction │
 blocks.min_overlap ──────────►│                         │
 blocks.min_shared ───────────►│                         │  ◄── diagnostic-only

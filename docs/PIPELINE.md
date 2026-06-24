@@ -296,7 +296,7 @@ Orchestrator: `run_step5_figures()` in `plot.R`. Renders four plotters at global
 
 Per-c80 glyphs (precedence top→bottom): `U` / `D` (focal up/down by `beta` sign), `F` (fragmented, fine only), `T` (truncated, fine only), `s` (small ORF). `fill_modes` is read from YAML `parse.fill_modes` (subset of `{beta, sample_prevalence, cor_to_b, fill_gene}`).
 
-### Step 6 — trait-associated block extraction (writes under `step6_blocks/`, gated by `blocks.skip`)
+### Step 6 — trait-associated block extraction (writes under `step6_blocks/`, gated by `blocks.skip_block`)
 
 Orchestrator: `run_step6_blocks()` in `blocks.R`. From `canonical_paths_c80s`, identify runs of consecutive focal c80s ("blocks") and rank representative blocks per joint component:
 
@@ -309,7 +309,7 @@ Orchestrator: `run_step6_blocks()` in `blocks.R`. From `canonical_paths_c80s`, i
 - `diagnose_rep_overlaps()` — diagnostic: how often surviving reps within a
   component share a substring but neither contains the other.
 
-If multiple representative blocks exist, a heatmap of block-by-genome membership is rendered to `step6_blocks/rep_heatmap.pdf` (via `pheatmap`). Skip the whole step by setting `blocks.skip: true`.
+If multiple representative blocks exist, a heatmap of block-by-genome membership is rendered to `step6_blocks/rep_heatmap.pdf` (via `pheatmap`). Skip the whole step by setting `blocks.skip_block: true`.
 
 ### c80s decoration (inside Step 3)
 

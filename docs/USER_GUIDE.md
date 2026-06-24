@@ -118,10 +118,10 @@ For `type: prokka` sources it converts each `<g>.gff → <g>.genes` **in place**
 
 **Step 0 — `prepare.R`.** Four responsibilities:
 
-1. Snapshot `<config.yaml>` to [`run_config`](../model.R) (`{proj_dir}/step1_setup/run_config.yaml`) for provenance.
-2. Seed the local copy of `clusters_80_updated` from `data.clusters_80_updated` into [`clusters_80_updated`](../model.R) on first run (`overwrite = FALSE`); subsequent runs preserve hand edits. To refresh from the source, `rm` the local copy.
-3. Read the user-provided focal table from `data.focal_meta` (path in the YAML; `{proj_dir}` / `{species_id}` / `{midasdb_dir}` placeholders expanded), optionally apply the `|score_col|` thresholds, and cache the result to [`focal_meta`](../model.R) (`step1_setup/gene_meta_full.tsv` — filename kept for back-compat).
-4. Walk every `is_focal == TRUE` centroid, check whether `<focal_c80>.tsv` already exists under [`neighbor_list`](../model.R), and write any missing centroids to [`gene_list`](../model.R) as a one-per-line list. If everything is present, `gene_list` is removed and a "Ready to run pipeline.R" message is printed.
+1. Snapshot `<config.yaml>` to [`run_config`](../R/model.R) (`{proj_dir}/step1_setup/run_config.yaml`) for provenance.
+2. Seed the local copy of `clusters_80_updated` from `data.clusters_80_updated` into [`clusters_80_updated`](../R/model.R) on first run (`overwrite = FALSE`); subsequent runs preserve hand edits. To refresh from the source, `rm` the local copy.
+3. Read the user-provided focal table from `data.focal_meta` (path in the YAML; `{proj_dir}` / `{species_id}` / `{midasdb_dir}` placeholders expanded), optionally apply the `|score_col|` thresholds, and cache the result to [`focal_meta`](../R/model.R) (`step1_setup/gene_meta_full.tsv` — filename kept for back-compat).
+4. Walk every `is_focal == TRUE` centroid, check whether `<focal_c80>.tsv` already exists under [`neighbor_list`](../R/model.R), and write any missing centroids to [`gene_list`](../R/model.R) as a one-per-line list. If everything is present, `gene_list` is removed and a "Ready to run pipeline.R" message is printed.
 
 Always overwrites — cheap to re-run.
 
@@ -135,7 +135,7 @@ Always overwrites — cheap to re-run.
 
 ## Configuration (YAML)
 
-All knobs live in one YAML file. Scalar sections are flattened into a single `job_config` namespace at load time, so any key from any section is accessible via `cfg_get(job_config, "<key>")`. **Exception:** `sources:` is a list (not a scalar section); `config.R` skips it, so it does not pollute `job_config`. It is consumed only by `build_genome_catalog.py`. See [`config.R`](../config.R) for the loader.
+All knobs live in one YAML file. Scalar sections are flattened into a single `job_config` namespace at load time, so any key from any section is accessible via `cfg_get(job_config, "<key>")`. **Exception:** `sources:` is a list (not a scalar section); `config.R` skips it, so it does not pollute `job_config`. It is consumed only by `build_genome_catalog.py`. See [`config.R`](../R/config.R) for the loader.
 
 ### `job` — required
 
@@ -168,7 +168,7 @@ data:
 
 Both `focal_meta` and `clusters_80_updated` are paths to TSVs the user provides. `prepare.R` snapshots them into the project directory: `focal_meta` is processed into `step1_setup/gene_meta_full.tsv` on every run, while `clusters_80_updated` is seeded once into `<data_dir>/<species_id>/clusters_80_info_updated.tsv` (`overwrite = FALSE`) and then left alone — so hand edits (e.g. appending ECOR-derived c80 rows) persist across reruns. To refresh from the source, `rm` the local copy and re-run prepare.R. `n_genes` is the flank size for `get_neighbor.sh`. `midas_dir` and `df_dir` were removed from this section: `midas_dir` lives under the parked `mwas:` section (see below); `df_dir` was dropped entirely (unused).
 
-**Path placeholders.** `{proj_dir}`, `{species_id}`, `{midasdb_dir}`, and `{input_dir}` are expanded in every YAML string scalar at load time (see `load_job_config` in [config.R](../config.R)). Use them anywhere in the YAML to avoid repeating long paths. Plain absolute paths still work unchanged.
+**Path placeholders.** `{proj_dir}`, `{species_id}`, `{midasdb_dir}`, and `{input_dir}` are expanded in every YAML string scalar at load time (see `load_job_config` in [config.R](../R/config.R)). Use them anywhere in the YAML to avoid repeating long paths. Plain absolute paths still work unchanged.
 
 - `{proj_dir}` — the **output** root. Used as-is; include `<species_id>` in the YAML value if you want per-species isolation.
 - `{input_dir}` — **input** root for the YAML config + the focal_meta TSV (the two user-authored files for this run). Keeps inputs separate from outputs. Declared under `job.input_dir` (required).
@@ -196,7 +196,7 @@ mwas:
   midas_dir:    ""                                       # gene-by-sample matrices root (MIDAS merge output)
 ```
 
-The `mwas:` section feeds the parked MWAS block in [model.R](../model.R) — `gene_by_sample_matrix`, `genes_to_heatmap`, `GRM_pop`, `pca_pop`. **None of these targets are read by the current operon pipeline.** Leave `midas_dir` empty unless you're wiring up the MWAS layer. The section exists so the plumbing is in place for re-integration without re-creating the path keys.
+The `mwas:` section feeds the parked MWAS block in [model.R](../R/model.R) — `gene_by_sample_matrix`, `genes_to_heatmap`, `GRM_pop`, `pca_pop`. **None of these targets are read by the current operon pipeline.** Leave `midas_dir` empty unless you're wiring up the MWAS layer. The section exists so the plumbing is in place for re-integration without re-creating the path keys.
 
 ### `sources` — required (consumed by `build_genome_catalog`)
 
@@ -273,7 +273,7 @@ path:
   truncation_cutoff: 0.8   # length / centroid_length below which a gene counts as truncated
 ```
 
-`path_min_genomes` is the **per-canonical-operon** survival cut applied in [`generate_canonical_path()`](../graph.R#L538). Conceptually distinct from Step 1's `focal_min_genomes`: Step 1 asks "is this neighborhood pattern recurring around a focal?" and Step 3 asks "does this canonical operon recur across enough strains?" — they need not have the same value, though they typically do.
+`path_min_genomes` is the **per-canonical-operon** survival cut applied in [`generate_canonical_path()`](../R/graph.R#L538). Conceptually distinct from Step 1's `focal_min_genomes`: Step 1 asks "is this neighborhood pattern recurring around a focal?" and Step 3 asks "does this canonical operon recur across enough strains?" — they need not have the same value, though they typically do.
 
 ### `blocks` — Step 6 block extraction (`blocks.R`)
 
@@ -316,7 +316,7 @@ plot:
   gene_padding_bp: 100   # bp gap between adjacent genes in gggenes layouts
 ```
 
-Used by both the Step 1 diagnostic figures ([`extract_gene_neighbor_patterns`](../neighbor.R#L324)) and the Step 5 publication figures ([`.layout_operon_tracks`](../plot.R#L245)) so spacing is consistent across all gggenes outputs.
+Used by both the Step 1 diagnostic figures ([`extract_gene_neighbor_patterns`](../R/neighbor.R#L324)) and the Step 5 publication figures ([`.layout_operon_tracks`](../R/plot.R#L245)) so spacing is consistent across all gggenes outputs.
 
 ---
 
@@ -416,12 +416,12 @@ Downstream, **delete the Step 1 cache** (`step2_neighbors/neighbor_groups.RDS`) 
 | **0** | Snapshot the YAML. Read focal_meta from YAML, optionally apply `\|score_col\|` thresholds, cache to `focal_meta` target. Enumerate any missing per-focal neighbor TSVs into `gene_list.tsv`. | [`prepare.R`](../prepare.R) | `config.R`, `model.R` | `run_config.yaml`, `gene_meta_full.tsv` (the `focal_meta` cache), `gene_list.tsv` |
 | **0** | Materialise the missing per-focal neighbor TSVs. | [`run_species.sh`](../run_species.sh) | `generate_neighbor_list.sh`, `get_neighbor.sh` | `list_of_neighbors/<focal_c80>.tsv` |
 | **Setup** | Load `cluster_80`, `gene_to_c80` (from the catalog `genes_info`), and the cached focal table. Re-check every focal has a neighbor TSV; abort if not. | [`pipeline.R`](../pipeline.R) lines 11–79 | `config.R`, `model.R` | — |
-| **1** | Per-focal neighborhood extraction → cross-genome assembly → small-ORF + length-variant labels. Orchestrated by [`run_step1_neighbor_extraction`](../neighbor.R). | `pipeline.R` lines 82–92 | `neighbor.R`, `midas.R` | `step2_neighbors/neighbor_groups.RDS` (cache) |
-| **2** | Per-genome operon graphs → maximal paths. Orchestrated by [`run_step2_path_stitching`](../graph.R). | `pipeline.R` lines 95–100 | `graph.R` | `step3_path/path_df.rds`, `step3_path/esupport_df.rds` |
-| **3** | Cross-genome consolidation → three granularity levels with trait stats and structural flags. Orchestrated by [`run_step3_consolidation`](../path.R). | `pipeline.R` lines 103–128 | `graph.R`, `path.R`, `parse.R` | `step3_path/canonical_paths*.tsv` (5 TSVs) |
-| **4** | Summaries, fine-coverage selection, exemplar-genome sampling, BLAST gene lists. Orchestrated by [`run_step4_parse`](../parse.R). | `pipeline.R` | `parse.R` | `step4_parse/*` |
-| **5** | gggenes figures: global + per-component PDFs for each fill mode. Orchestrated by [`run_step5_figures`](../plot.R). | `pipeline.R` | `plot.R` | `step5_figures/*` |
-| **6** | Trait-associated block extraction + non-redundant representative ranking + per-genome attribution. Gated by `blocks.skip_block`. Orchestrated by [`run_step6_blocks`](../blocks.R). | `pipeline.R` | `blocks.R` | `step6_blocks/{representative_path.tsv, rep.tsv, rep_heatmap.pdf}` |
+| **1** | Per-focal neighborhood extraction → cross-genome assembly → small-ORF + length-variant labels. Orchestrated by [`run_step1_neighbor_extraction`](../R/neighbor.R). | `pipeline.R` lines 82–92 | `neighbor.R`, `midas.R` | `step2_neighbors/neighbor_groups.RDS` (cache) |
+| **2** | Per-genome operon graphs → maximal paths. Orchestrated by [`run_step2_path_stitching`](../R/graph.R). | `pipeline.R` lines 95–100 | `graph.R` | `step3_path/path_df.rds`, `step3_path/esupport_df.rds` |
+| **3** | Cross-genome consolidation → three granularity levels with trait stats and structural flags. Orchestrated by [`run_step3_consolidation`](../R/path.R). | `pipeline.R` lines 103–128 | `graph.R`, `path.R`, `parse.R` | `step3_path/canonical_paths*.tsv` (5 TSVs) |
+| **4** | Summaries, fine-coverage selection, exemplar-genome sampling, BLAST gene lists. Orchestrated by [`run_step4_parse`](../R/parse.R). | `pipeline.R` | `parse.R` | `step4_parse/*` |
+| **5** | gggenes figures: global + per-component PDFs for each fill mode. Orchestrated by [`run_step5_figures`](../R/plot.R). | `pipeline.R` | `plot.R` | `step5_figures/*` |
+| **6** | Trait-associated block extraction + non-redundant representative ranking + per-genome attribution. Gated by `blocks.skip_block`. Orchestrated by [`run_step6_blocks`](../R/blocks.R). | `pipeline.R` | `blocks.R` | `step6_blocks/{representative_path.tsv, rep.tsv, rep_heatmap.pdf}` |
 
 For each numbered step, [STEPS.md](STEPS.md) gives a complete input / output / logic / caveats writeup.
 
@@ -463,14 +463,14 @@ Easy to confuse. They differ in **scope** and **resolution**.
 |---|---|---|---|
 | `c80` | coarse | the operon's own focal cluster id | L1 c80s table only |
 | `neighbor_c80_coarse` | coarse | a neighbor's MIDAS cluster id (a real centroid_80, or a synthetic `_<focal>-<type>_<rank>` for short ORFs) | everywhere |
-| `neighbor_c80_fine` | length-variant-aware | same as `neighbor_c80_coarse` but with `_<rank>` suffix when the cluster has multiple observed lengths | L2 fine c80s table; produced by Step 1 ([`compute_c80_variants()`](../midas.R#L215)) |
+| `neighbor_c80_fine` | length-variant-aware | same as `neighbor_c80_coarse` but with `_<rank>` suffix when the cluster has multiple observed lengths | L2 fine c80s table; produced by Step 1 ([`compute_c80_variants()`](../R/midas.R#L215)) |
 
 Two practical rules:
 
 - **For coarse grouping** (collapse all length variants of a cluster) → use `neighbor_c80_coarse`.
 - **For length-sensitive analyses** (truncation, fragmentation, isoform identity) → use `neighbor_c80_fine` and the L2 fine table.
 
-In the L1 c80s table, `neighbor_c80_coarse == c80` after the [`build_canonical_paths_c80s()`](../path.R#L265) join — they're kept as parallel columns for join-compatibility, not because they hold different information.
+In the L1 c80s table, `neighbor_c80_coarse == c80` after the [`build_canonical_paths_c80s()`](../R/path.R#L265) join — they're kept as parallel columns for join-compatibility, not because they hold different information.
 
 ---
 
@@ -501,15 +501,17 @@ pangenome-operons-v2/
 ├── get_neighbor.sh             #     ↳ per-genome: ±n_genes flank from one .genes file
 ├── prepare.R                   # Step 0: snapshot YAML, process focal_meta, list missing TSVs
 ├── pipeline.R                  # Steps 1-6: the driver — reads top-to-bottom
-├── config.R                    # YAML loader + cfg_get
-├── model.R                     # target_layout + get_target (file-path resolver)
-├── neighbor.R                  # Step 1: per-focal neighborhood pipeline
-├── midas.R                     # Step 1: small-ORF + length-variant labels; load_c80_tables
-├── graph.R                     # Step 2 + Step 3: graph building, joint components, orientation
-├── path.R                      # Step 3: canonical → fine → per-genome expansions
-├── blocks.R                    # Step 6: hit blocks + reps + per-genome attribution
-├── parse.R                     # Step 4 orchestrator + Step 3 c80s decorators + Step 5 plot data-prep helpers
-├── plot.R                      # Step 5: global + per-component gggenes plots (and Step 1 diagnostic plots)
+├── install_packages.R          # one-off: install the R package deps
+├── R/                          # sourced helper modules (loaded by prepare.R / pipeline.R)
+│   ├── config.R                # YAML loader + cfg_get
+│   ├── model.R                 # target_layout + get_target (file-path resolver)
+│   ├── neighbor.R              # Step 1: per-focal neighborhood pipeline
+│   ├── midas.R                 # Step 1: small-ORF + length-variant labels; load_c80_tables
+│   ├── graph.R                 # Step 2 + Step 3: graph building, joint components, orientation
+│   ├── path.R                  # Step 3: canonical → fine → per-genome expansions
+│   ├── blocks.R                # Step 6: hit blocks + reps + per-genome attribution
+│   ├── parse.R                 # Step 4 orchestrator + Step 3 c80s decorators + Step 5 plot data-prep helpers
+│   └── plot.R                  # Step 5: global + per-component gggenes plots (and Step 1 diagnostic plots)
 ├── example.yaml                # template config
 ├── environment.yml             # conda env
 ├── examples/                   # worked-example input bundles (one per real run)
@@ -561,7 +563,7 @@ pangenome-operons-v2/
 
 These are documented here so you don't trip on them. Tracked items live in [parked/ROADMAP.md](../parked/ROADMAP.md).
 
-1. **Mirror-block reps survive in Step 6.** [`is_contig_subseq`](../blocks.R#L388) is forward-direction only; a block and its exact reverse end up as two separate reps. The diagnostic in `diagnose_rep_overlaps` will catch this if it happens.
+1. **Mirror-block reps survive in Step 6.** [`is_contig_subseq`](../R/blocks.R#L388) is forward-direction only; a block and its exact reverse end up as two separate reps. The diagnostic in `diagnose_rep_overlaps` will catch this if it happens.
 2. **Step 1 orientation is not preserved into Steps 2/3.** Step 2 re-derives chromosomal order; Step 3 canonicalizes lexicographically (with synthetic small-ORF tokens stripped from the decision; see `clean_for_orientation` in `graph.R`). Within-component direction consistency is the strongest guarantee you get on the output side.
 3. **Off-species c80s have NA c80 metadata.** ECOR genes can map to centroid_80s from any species. Their `neighbor_c80_length_coarse` / `genome_prevalence` come through as NA after the `load_c80_tables` join; downstream NA-tolerant.
 

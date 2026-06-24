@@ -621,8 +621,8 @@ plot_fine_operons_by_component <- function(fine_summary, canonical_paths_fine_c8
 #' first and call this function:
 #'
 #' \preformatted{
-#' Rscript -e 'source("config.R"); source("model.R");
-#'             source("parse.R");  source("plot.R");
+#' Rscript -e 'source("R/config.R"); source("R/model.R");
+#'             source("R/parse.R");  source("R/plot.R");
 #'             load_job_config("example.yaml");
 #'             selected_coarse <- read_delim(get_target("parse_selected_coarse"), delim = "\\t", show_col_types = FALSE);
 #'             selected_fine <- read_delim(get_target("parse_selected_fine"), delim = "\\t", show_col_types = FALSE);

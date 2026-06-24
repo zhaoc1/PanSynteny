@@ -127,8 +127,8 @@ These keys produce log/warning messages but never filter rows out of any output:
 
 Only `path.path_min_genomes` is consumed by more than one step:
 
-- **Step 3** ([path.R:445](../path.R#L445)): the canonical-operon survival floor. Operons backed by < `path_min_genomes` strains are dropped from L1 onward.
-- **Step 4** ([parse.R:658](../parse.R#L658)): the fine-isoform survival threshold is `ceiling(path_min_genomes * fine_coverage_ratio)`.
+- **Step 3** ([path.R:445](../R/path.R#L445)): the canonical-operon survival floor. Operons backed by < `path_min_genomes` strains are dropped from L1 onward.
+- **Step 4** ([parse.R:658](../R/parse.R#L658)): the fine-isoform survival threshold is `ceiling(path_min_genomes * fine_coverage_ratio)`.
 
 If you tighten `path_min_genomes`, both gates get stricter together; the fine-isoform cut is relative.
 

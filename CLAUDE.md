@@ -50,7 +50,7 @@ Working example config: [example.yaml](example.yaml). A real worked-example inpu
 There is no test suite, no Makefile, no lint config. To smoke-test that a single helper file still parses after edits:
 
 ```bash
-Rscript -e 'invisible(parse(file = "graph.R")); cat("OK\n")'
+Rscript -e 'invisible(parse(file = "R/graph.R")); cat("OK\n")'
 ```
 
 Setup details (conda env, R + Python packages, troubleshooting) live in [SETUP.md](docs/SETUP.md).
@@ -65,15 +65,15 @@ Single R script per pipeline stage; `pipeline.R` is the linear driver and reads 
 | --- | --- |
 | [pipeline.R](pipeline.R) | Driver. Sources every helper, loads config, calls `run_step{1..6}_*` in order. |
 | [prepare.R](prepare.R) | Step 0. Snapshots `<config.yaml>` to the proj_dir; reads `data.focal_meta` from YAML, optionally applies `\|score_col\|` thresholds, caches to `get_target("focal_meta")`; enumerates missing per-focal neighbor TSVs. Sources only `config.R` + `model.R`. |
-| [config.R](config.R) | YAML loader. `load_job_config()` flattens every scalar YAML section into a single `job_config` env; `cfg_get(job_config, "key")` is the only accessor. List sections (e.g. `sources:`) are silently skipped. |
-| [model.R](model.R) | `target_layout()` — single source of truth for every input + output file path keyed by name. `get_target("key")` resolves against active config. The `# MWAS (parked)` block at the bottom is reserved for re-integration and not read by the current pipeline. |
-| [neighbor.R](neighbor.R) | Step 1: per-focal neighborhood extraction. |
-| [midas.R](midas.R) | Step 1: small-ORF synthetic labels + length-variant labels; `load_c80_tables()` reads `catalog_genes_info` + `clusters_80_updated`. |
-| [graph.R](graph.R) | Step 2: per-genome graphs → maximal paths. Step 3: canonicalization, joint components, orientation. |
-| [path.R](path.R) | Step 3: canonical → fine → per-genome expansions. |
-| [parse.R](parse.R) | Step 3 c80s decorators (small-ORF, truncation/fragmentation). Step 4 orchestrator. |
-| [plot.R](plot.R) | Step 5: gggenes plotters (global + per-component). Plus Step 1 diagnostic plots. |
-| [blocks.R](blocks.R) | Step 6: trait-associated block extraction + representative ranking. |
+| [config.R](R/config.R) | YAML loader. `load_job_config()` flattens every scalar YAML section into a single `job_config` env; `cfg_get(job_config, "key")` is the only accessor. List sections (e.g. `sources:`) are silently skipped. |
+| [model.R](R/model.R) | `target_layout()` — single source of truth for every input + output file path keyed by name. `get_target("key")` resolves against active config. The `# MWAS (parked)` block at the bottom is reserved for re-integration and not read by the current pipeline. |
+| [neighbor.R](R/neighbor.R) | Step 1: per-focal neighborhood extraction. |
+| [midas.R](R/midas.R) | Step 1: small-ORF synthetic labels + length-variant labels; `load_c80_tables()` reads `catalog_genes_info` + `clusters_80_updated`. |
+| [graph.R](R/graph.R) | Step 2: per-genome graphs → maximal paths. Step 3: canonicalization, joint components, orientation. |
+| [path.R](R/path.R) | Step 3: canonical → fine → per-genome expansions. |
+| [parse.R](R/parse.R) | Step 3 c80s decorators (small-ORF, truncation/fragmentation). Step 4 orchestrator. |
+| [plot.R](R/plot.R) | Step 5: gggenes plotters (global + per-component). Plus Step 1 diagnostic plots. |
+| [blocks.R](R/blocks.R) | Step 6: trait-associated block extraction + representative ranking. |
 
 Note the v0.2.0 step renumbering vs v0.1.0: parse was Step 5 → now Step 4; figures was Step 6 → now Step 5; block extraction was Step 4 → now Step 6 (and is now skippable; see gotchas).
 
@@ -119,7 +119,7 @@ pipeline.R Step 1    per-focal neighbor TSVs + catalog c80 tables
            Step 6    canonical_paths_c80s      -->  representative_path.tsv + rep.tsv (block reps × genome)
 ```
 
-All R outputs land under `<proj_dir>/{step1_setup, step2_neighbors, step3_path, step4_parse, step5_figures, step6_blocks}/` — this now includes the genome catalog (`step1_setup/catalog_{genes_info,genome_toc}.tsv`), so per-run isolation is the default. Per-focal neighbor TSVs stay under `{data_dir}/{species_id}/list_of_neighbors/` (species-shared across proj_dirs). Layout is fixed by `target_layout()` in [model.R](model.R) — **always go through `get_target("key")` rather than constructing paths inline.**
+All R outputs land under `<proj_dir>/{step1_setup, step2_neighbors, step3_path, step4_parse, step5_figures, step6_blocks}/` — this now includes the genome catalog (`step1_setup/catalog_{genes_info,genome_toc}.tsv`), so per-run isolation is the default. Per-focal neighbor TSVs stay under `{data_dir}/{species_id}/list_of_neighbors/` (species-shared across proj_dirs). Layout is fixed by `target_layout()` in [model.R](R/model.R) — **always go through `get_target("key")` rather than constructing paths inline.**
 
 ### The three granularity levels (Step 3 is the analytical core)
 
@@ -172,7 +172,7 @@ When the user asks about pipeline behavior, prefer the source docs over re-deriv
 - [SETUP.md](docs/SETUP.md) — R + Python package install, conda env, troubleshooting.
 - `parked/` — supplementary docs not in the active flow: ROADMAP.md, CRITIQUE.md, VALIDATION.md, FLOWCHART.md.
 
-The MD docs reference function definitions by line number (e.g. `[run_step1_neighbor_extraction](neighbor.R#L791)`). When you edit those functions, **update the line numbers** — there is a recent commit (6f7ba3a) titled "Remove dead functions flagged in previous sweep" and one (f140b94) titled "docs: refresh driver line numbers", so the user actively maintains this and notices when it drifts.
+The MD docs reference function definitions by line number (e.g. `[run_step1_neighbor_extraction](R/neighbor.R#L791)`). When you edit those functions, **update the line numbers** — there is a recent commit (6f7ba3a) titled "Remove dead functions flagged in previous sweep" and one (f140b94) titled "docs: refresh driver line numbers", so the user actively maintains this and notices when it drifts.
 
 ## Gotchas
 

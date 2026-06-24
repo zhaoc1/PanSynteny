@@ -42,8 +42,8 @@ suppressPackageStartupMessages({
   library(readr)
 })
 
-source("config.R")
-source("model.R")
+source("R/config.R")
+source("R/model.R")
 
 load_job_config(args[1])
 

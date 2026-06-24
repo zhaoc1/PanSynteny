@@ -1,8 +1,8 @@
 # SCHEMA.md — File schemas and data formats
 
-The single source of truth for every file the pipeline reads or writes: where it lives, what columns it has, who writes it, who reads it, and any non-obvious semantics. Every entry below is keyed by the [model.R](../model.R) target name (where one exists) so you can grep both sides at once.
+The single source of truth for every file the pipeline reads or writes: where it lives, what columns it has, who writes it, who reads it, and any non-obvious semantics. Every entry below is keyed by the [model.R](../R/model.R) target name (where one exists) so you can grep both sides at once.
 
-**How this is organised.** Sections follow [model.R](../model.R)'s **consumer-based** Input / Output split (§3 = `# Input` block, §4 = `# Output` block). A file written by Step 0 (e.g., the focal_meta cache, the catalog files) lives under "Pipeline inputs" because that's how it's used downstream, even though it's produced upstream. The §3 entries note the producer in each "Writer" row.
+**How this is organised.** Sections follow [model.R](../R/model.R)'s **consumer-based** Input / Output split (§3 = `# Input` block, §4 = `# Output` block). A file written by Step 0 (e.g., the focal_meta cache, the catalog files) lives under "Pipeline inputs" because that's how it's used downstream, even though it's produced upstream. The §3 entries note the producer in each "Writer" row.
 
 For pipeline behaviour and run order, see [USER_GUIDE.md](USER_GUIDE.md). For per-step input/output logic, see [STEPS.md](STEPS.md). For c80-column semantics (coarse vs fine), see [PIPELINE.md](PIPELINE.md).
 
@@ -12,7 +12,7 @@ For pipeline behaviour and run order, see [USER_GUIDE.md](USER_GUIDE.md). For pe
 
 These are the files the user supplies; everything downstream is derived from them.
 
-> **Path placeholders.** `load_job_config` ([config.R](../config.R)) expands `{proj_dir}`, `{species_id}`, `{midasdb_dir}`, and `{input_dir}` in every YAML string scalar at load time — so the paths below can be written as e.g. `"{input_dir}/focal.tsv"` or `"{midasdb_dir}/pangenomes/{species_id}/clusters_80_info_updated.tsv"`. `{proj_dir}` is the **output** root (used as-is from `job.proj_dir`); `{input_dir}` is the required **input** root holding the two user-authored files for this run (the YAML config + the focal_meta TSV), declared under `job.input_dir`. Plain absolute paths work unchanged. The same global placeholders are also recognised by `build_genome_catalog.py` for `sources:` paths; each source entry may additionally declare per-source local placeholders (any non-reserved string field, e.g. `ecor_dir: "/path"` → `{ecor_dir}`) usable within its own `genes_info` / `genomes_dir`.
+> **Path placeholders.** `load_job_config` ([config.R](../R/config.R)) expands `{proj_dir}`, `{species_id}`, `{midasdb_dir}`, and `{input_dir}` in every YAML string scalar at load time — so the paths below can be written as e.g. `"{input_dir}/focal.tsv"` or `"{midasdb_dir}/pangenomes/{species_id}/clusters_80_info_updated.tsv"`. `{proj_dir}` is the **output** root (used as-is from `job.proj_dir`); `{input_dir}` is the required **input** root holding the two user-authored files for this run (the YAML config + the focal_meta TSV), declared under `job.input_dir`. Plain absolute paths work unchanged. The same global placeholders are also recognised by `build_genome_catalog.py` for `sources:` paths; each source entry may additionally declare per-source local placeholders (any non-reserved string field, e.g. `ecor_dir: "/path"` → `{ecor_dir}`) usable within its own `genes_info` / `genomes_dir`.
 
 ### `data.focal_meta` — focal-gene metadata
 
@@ -158,7 +158,7 @@ The genome_id derivation from gene_id is shared with `generate_neighbor_list.sh`
 
 ## 3. Pipeline inputs — Step 0 caches and seeded copies
 
-These are the model.R `# Input` targets: paths the analytical pipeline (and the Step 0 bash chain) **reads** during a run. They're produced upstream by `prepare.R`, `build_genome_catalog.py`, or `run_species.sh` — but from the consumer's perspective they are inputs to the work that follows. Paths reference [model.R](../model.R) target keys.
+These are the model.R `# Input` targets: paths the analytical pipeline (and the Step 0 bash chain) **reads** during a run. They're produced upstream by `prepare.R`, `build_genome_catalog.py`, or `run_species.sh` — but from the consumer's perspective they are inputs to the work that follows. Paths reference [model.R](../R/model.R) target keys.
 
 ### `run_config` — config snapshot
 
@@ -196,7 +196,7 @@ Same columns as the input `data.focal_meta` (see §1), with `is_focal` possibly 
 | **Path** | `{data_dir}/{species_id}/clusters_80_info_updated.tsv` |
 | **Schema** | Same as `data.clusters_80_updated` input (see §1). |
 | **Writer** | [`prepare.R`](../prepare.R), seeded once (`overwrite = FALSE`). |
-| **Reader** | [`pipeline.R`](../pipeline.R) via [`load_c80_tables`](../midas.R) — provides per-c80 `genome_prevalence` + `neighbor_c80_length_coarse` on `gene_to_c80`. |
+| **Reader** | [`pipeline.R`](../pipeline.R) via [`load_c80_tables`](../R/midas.R) — provides per-c80 `genome_prevalence` + `neighbor_c80_length_coarse` on `gene_to_c80`. |
 
 ### `catalog_genes_info` — unified gene → c80 map
 
@@ -205,7 +205,7 @@ Same columns as the input `data.focal_meta` (see §1), with `is_focal` possibly 
 | **Path** | `{proj_dir}/step1_setup/catalog_genes_info.tsv` |
 | **Header** | Yes. |
 | **Writer** | [`build_genome_catalog.py`](../build_genome_catalog.py), rebuilt every run. |
-| **Reader** | [`generate_neighbor_list.sh`](../generate_neighbor_list.sh) (per-focal gene-member lookup); [`load_c80_tables`](../midas.R) (drives `gene_to_c80`). |
+| **Reader** | [`generate_neighbor_list.sh`](../generate_neighbor_list.sh) (per-focal gene-member lookup); [`load_c80_tables`](../R/midas.R) (drives `gene_to_c80`). |
 
 | Col | Name |
 |---|---|
@@ -236,9 +236,9 @@ One row per unique `genome_id` across all sources. Duplicate `genome_id` across 
 | | |
 |---|---|
 | **Path** | `{data_dir}/{species_id}/list_of_neighbors/<focal_c80>.tsv` |
-| **Header** | **No** (deliberately, for awk consumers; `cols_neighbors` in [neighbor.R](../neighbor.R) assigns names on read). |
+| **Header** | **No** (deliberately, for awk consumers; `cols_neighbors` in [neighbor.R](../R/neighbor.R) assigns names on read). |
 | **Writer** | [`get_neighbor.sh`](../get_neighbor.sh) via [`generate_neighbor_list.sh`](../generate_neighbor_list.sh) ([`run_species.sh`](../run_species.sh) fans the parallel xargs). |
-| **Reader** | [`load_gene_neighbors`](../neighbor.R) (Step 1). |
+| **Reader** | [`load_gene_neighbors`](../R/neighbor.R) (Step 1). |
 | **Idempotency** | `-s "$outfile"` skip — a non-empty existing TSV is left alone. |
 
 | Col | Name | Source |
@@ -292,7 +292,7 @@ For column lists on each Step 1-6 output, see [STEPS.md](STEPS.md) and the roxyg
 
 ## 5. MWAS (parked) targets
 
-Declared in [model.R](../model.R)'s `# MWAS (parked)` block. **Not read by the current pipeline** — placeholders for future MWAS re-integration. Listed here for completeness.
+Declared in [model.R](../R/model.R)'s `# MWAS (parked)` block. **Not read by the current pipeline** — placeholders for future MWAS re-integration. Listed here for completeness.
 
 | Target | Path | Format |
 |---|---|---|

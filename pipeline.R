@@ -31,15 +31,15 @@ suppressPackageStartupMessages({
   library(data.table)   # also attached inside midas.R / neighbor.R / plot.R; preload here silences their startup conflict messages
 })
 
-source("config.R")
-source("model.R")
-source("graph.R")
-source("path.R")
-source('neighbor.R')
-source('midas.R')
-source('blocks.R')
-source('plot.R')
-source("parse.R")
+source("R/config.R")
+source("R/model.R")
+source("R/graph.R")
+source("R/path.R")
+source("R/neighbor.R")
+source("R/midas.R")
+source("R/blocks.R")
+source("R/plot.R")
+source("R/parse.R")
 
 load_job_config(args[1])
 

@@ -650,7 +650,7 @@ extract_and_write_per_focal_neighbors <- function(focal_c80_df, gene_to_c80) {
     group_walk(~{
       focal_c80 <- .y$focal_c80[[1]]
       focal_label <- .y$focal_label[[1]]
-      message("c80=", focal_c80, " | label=", focal_label)
+      message("focal_c80=", focal_c80, " | focal_label=", focal_label)
 
       in_fp <- file.path(get_target("neighbor_list"), paste0(focal_c80, ".tsv"))
       if (!file.exists(in_fp)) {
@@ -664,7 +664,7 @@ extract_and_write_per_focal_neighbors <- function(focal_c80_df, gene_to_c80) {
           write_gene_neighbor(gene_neighbors, focal_c80, focal_label)
         }
       }, error = function(e) {
-        message("Error in group c80=", focal_c80, " | label=", focal_label,
+        message("Error in group focal_c80=", focal_c80, " | focal_label=", focal_label,
                 ":\n   ", conditionMessage(e))
       })
     }, .keep = TRUE)

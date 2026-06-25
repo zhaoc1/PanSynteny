@@ -139,12 +139,12 @@ If you tighten `path_min_genomes`, both gates get stricter together; the fine-is
 ```bash
 # every cfg_get key the R pipeline reads must be present in the YAML
 comm -23 \
-  <(grep -hoE 'cfg_get\(job_config, "[^"]+"\)' *.R | sed -E 's/.*"([^"]+)".*/\1/' | sort -u) \
+  <(grep -hoE 'cfg_get\(job_config, "[^"]+"\)' R/*.R *.R | sed -E 's/.*"([^"]+)".*/\1/' | sort -u) \
   <(grep -E '^[[:space:]]+[a-z_]+:' example.yaml | sed -E 's/^[[:space:]]+([a-z_]+):.*/\1/' | sort -u)
 # (should print nothing; `proj_dir` is read directly via job_config$proj_dir, not cfg_get — known)
 
 # every cfg_get key, grouped by file
-grep -hnE 'cfg_get\(job_config, "[^"]+"\)' *.R | \
+grep -hnE 'cfg_get\(job_config, "[^"]+"\)' R/*.R *.R | \
   sed -E 's|^([^:]+):([0-9]+):.*"([^"]+)".*|\3\t\1:\2|' | sort
 
 # bash/python yaml keys (Step 0a + Step 0 chain)

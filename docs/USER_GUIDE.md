@@ -81,7 +81,7 @@ bash    run_species.sh          <config.yaml>
 Rscript pipeline.R              <config.yaml>
 ```
 
-Working example config: [`example.yaml`](../example.yaml) (template). A real worked-example input bundle (config + focal_meta TSV) lives under [`examples/`](../examples/).
+Working example config: [`example.yaml`](../example.yaml) (template).
 
 ### Tip — pin the env's `python` / `Rscript` in shell variables
 
@@ -514,17 +514,15 @@ pangenome-operons-v2/
 │   └── plot.R                  # Step 5: global + per-component gggenes plots (and Step 1 diagnostic plots)
 ├── example.yaml                # template config
 ├── environment.yml             # conda env
-├── examples/                   # worked-example input bundles (one per real run)
 ├── README.md                   # landing — quickstart + install
 ├── CLAUDE.md                   # orientation for AI agents
-├── docs/
-│   ├── USER_GUIDE.md           # this file
-│   ├── STEPS.md                # per-step deep dive
-│   ├── SCHEMA.md               # column-level schemas for every file the pipeline touches
-│   ├── PIPELINE.md             # c80 glossary + truncation/fragmentation flag semantics
-│   ├── diagram.md              # YAML key → consumer-step data flow
-│   └── SETUP.md                # env setup + troubleshooting
-└── parked/                     # supplementary docs not in the active flow
+└── docs/
+    ├── USER_GUIDE.md           # this file
+    ├── STEPS.md                # per-step deep dive
+    ├── SCHEMA.md               # column-level schemas for every file the pipeline touches
+    ├── PIPELINE.md             # c80 glossary + truncation/fragmentation flag semantics
+    ├── diagram.md              # YAML key → consumer-step data flow
+    └── SETUP.md                # env setup + troubleshooting
 ```
 
 ---
@@ -561,7 +559,7 @@ pangenome-operons-v2/
 
 ## Known issues
 
-These are documented here so you don't trip on them. Tracked items live in [parked/ROADMAP.md](../parked/ROADMAP.md).
+These are documented here so you don't trip on them.
 
 1. **Mirror-block reps survive in Step 6.** [`is_contig_subseq`](../R/blocks.R#L388) is forward-direction only; a block and its exact reverse end up as two separate reps. The diagnostic in `diagnose_rep_overlaps` will catch this if it happens.
 2. **Step 1 orientation is not preserved into Steps 2/3.** Step 2 re-derives chromosomal order; Step 3 canonicalizes lexicographically (with synthetic small-ORF tokens stripped from the decision; see `clean_for_orientation` in `graph.R`). Within-component direction consistency is the strongest guarantee you get on the output side.
@@ -571,7 +569,7 @@ These are documented here so you don't trip on them. Tracked items live in [park
 
 ## Where to look next
 
-- **Run end-to-end:** `python build_genome_catalog.py my_run.yaml; Rscript prepare.R my_run.yaml; bash run_species.sh my_run.yaml; Rscript pipeline.R my_run.yaml`. Outputs land in `proj_dir/{step1_setup,step2_neighbors,step3_path,step4_parse,step5_figures,step6_blocks}/` (where `proj_dir` is what you set in the YAML — include `<species_id>` if you want per-species isolation) and `data_dir/<species_id>/{list_of_neighbors,clusters_80_info_updated.tsv}`. (For a real input bundle to point your config at, see [`examples/`](../examples/).)
+- **Run end-to-end:** `python build_genome_catalog.py my_run.yaml; Rscript prepare.R my_run.yaml; bash run_species.sh my_run.yaml; Rscript pipeline.R my_run.yaml`. Outputs land in `proj_dir/{step1_setup,step2_neighbors,step3_path,step4_parse,step5_figures,step6_blocks}/` (where `proj_dir` is what you set in the YAML — include `<species_id>` if you want per-species isolation) and `data_dir/<species_id>/{list_of_neighbors,clusters_80_info_updated.tsv}`.
 - **Read a step in detail:** [STEPS.md](STEPS.md) §STEP N has the full input / output / logic.
 - **Read a function in detail:** every helper has a roxygen-style docstring covering arguments, behavior, and known caveats. Start from the function's call site in `pipeline.R` and follow the link.
 - **Trace a column back through the pipeline:** the order of derivation is roughly Step 1 (neighbor table) → Step 2 (path strings) → Step 3 (canonical/fine/per-genome) → Step 6 (block reps). The c80 column table above explains the three c80 flavors.

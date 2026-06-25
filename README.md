@@ -90,7 +90,6 @@ python -c "import yaml, gffutils; print(yaml.__version__, gffutils.__version__)"
 | **[PIPELINE.md](docs/PIPELINE.md)** | You need the c80-column glossary or the truncation/fragmentation flag semantics. |
 | **[diagram.md](docs/diagram.md)** | You want the YAML-key → consumer-step data flow. |
 | **[CLAUDE.md](CLAUDE.md)** | You're a Claude / AI agent working on this repo (keystones, conventions, gotchas). |
-| `parked/` | Project meta: roadmap, critique, validation questions, slide-deck flowchart. Not part of the active doc flow. |
 
 ---
 

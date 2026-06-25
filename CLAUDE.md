@@ -41,7 +41,7 @@ bash    run_species.sh          <config.yaml>
 Rscript pipeline.R              <config.yaml>
 ```
 
-Working example config: [example.yaml](example.yaml). A real worked-example input bundle (config + focal_meta TSV) lives under [examples/](examples/). `prepare.R` is cheap to re-run (always overwrites the focal_meta cache, the run_config.yaml snapshot, and gene_list.tsv). `pipeline.R` aborts at startup if the focal_meta cache is missing or any `is_focal == TRUE` centroid lacks its neighbor TSV under `neighbor_list/` — both errors point back to `prepare.R`.
+Working example config: [example.yaml](example.yaml). `prepare.R` is cheap to re-run (always overwrites the focal_meta cache, the run_config.yaml snapshot, and gene_list.tsv). `pipeline.R` aborts at startup if the focal_meta cache is missing or any `is_focal == TRUE` centroid lacks its neighbor TSV under `neighbor_list/` — both errors point back to `prepare.R`.
 
 **Per-focal neighbor TSVs are now materialised in-repo.** `run_species.sh` consumes `gene_list.tsv` (the missing-list `prepare.R` writes) and fans `generate_neighbor_list.sh` over each focal; per-focal idempotency lives in that script. There is no longer an external preprocessing job to coordinate (v0.1.0 required one).
 
@@ -170,9 +170,8 @@ When the user asks about pipeline behavior, prefer the source docs over re-deriv
 - [SCHEMA.md](docs/SCHEMA.md) — every file the pipeline reads or writes, by columns. Single source of truth for data formats.
 - [PIPELINE.md](docs/PIPELINE.md) — c80 column glossary + truncation/fragmentation flag semantics.
 - [SETUP.md](docs/SETUP.md) — R + Python package install, conda env, troubleshooting.
-- `parked/` — supplementary docs not in the active flow: ROADMAP.md, CRITIQUE.md, VALIDATION.md, FLOWCHART.md.
 
-The MD docs reference function definitions by line number (e.g. `[run_step1_neighbor_extraction](R/neighbor.R#L791)`). When you edit those functions, **update the line numbers** — there is a recent commit (6f7ba3a) titled "Remove dead functions flagged in previous sweep" and one (f140b94) titled "docs: refresh driver line numbers", so the user actively maintains this and notices when it drifts.
+The MD docs reference function definitions by line number (e.g. `[run_step1_neighbor_extraction](R/neighbor.R#L798)`). When you edit those functions, **update the line numbers** — there is a recent commit (6f7ba3a) titled "Remove dead functions flagged in previous sweep" and one (f140b94) titled "docs: refresh driver line numbers", so the user actively maintains this and notices when it drifts.
 
 ## Gotchas
 
@@ -200,13 +199,10 @@ Landmines that have caught people. Read before changing anything in these areas.
 
 - **Catalog `genes_info.tsv` has a header.** Awk consumers must `FNR==1 { next }`. `generate_neighbor_list.sh` already does; if you add a new awk reader, replicate it.
 
-- **Don't `source()` from `archive/`.** Files there are intentionally stale historical versions kept for archaeology only.
-
 ## Conventions worth knowing
 
 - **Every helper has a roxygen-style docstring** covering arguments, behavior, and known caveats. Read it before changing the function body.
 - **`get_target("key")` everywhere.** Never hardcode a path under `step{N}_*/`; add a key to `target_layout()` instead.
 - **`cfg_get(job_config, "key")` for every tunable.** No `cfg_get`-bypassing constants in helper files. The full set of YAML keys + defaults is enumerated in [USER_GUIDE.md §Tunables](docs/USER_GUIDE.md).
 - **Caches are RDS or TSV; deletion is the re-run signal.** Document in any new step which file gates re-execution.
-- **`archive/` holds historical versions of every script** (timestamped subdirs) plus completed plan MDs. Useful for "what did this used to do" archaeology, but **never `source()` from `archive/`** — those files are intentionally stale.
 - **The `manuscript/` directory is gitignored.** Don't commit it without asking.

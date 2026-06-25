@@ -468,7 +468,7 @@ From `blocks`:
 
 ### Known caveats
 
-- **Redundancy is subset-only, forward-direction.** [`is_contig_subseq()`](../R/blocks.R#L388) does not test the reverse of `p`. A block and its exact mirror survive as two separate reps. A reverse-aware variant (`is_contig_subseq(rev(p), r)`) is documented in `annotate_group` but not wired in (see [parked/ROADMAP.md](../parked/ROADMAP.md) R2).
+- **Redundancy is subset-only, forward-direction.** [`is_contig_subseq()`](../R/blocks.R#L388) does not test the reverse of `p`. A block and its exact mirror survive as two separate reps. A reverse-aware variant (`is_contig_subseq(rev(p), r)`) is documented in `annotate_group` but not wired in.
 - **Substring-overlap pairs survive.** The diagnostic `diagnose_rep_overlaps` exists precisely because reps that share a contiguous substring but neither contains the other can't be collapsed by the subset-only check, and may double-count genomes downstream.
 - **Block-level `block_uid` collides with no other `uid`** because of the `cmp...-rank...-nge...` prefix; do not confuse with the canonical-level `uid` from Step 3 or the isoform-level `uid_fine`.
 

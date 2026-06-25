@@ -54,9 +54,9 @@ The pipeline writes figures directly via `ggsave` — no LaTeX needed. LaTeX is 
 
 ## Dependencies summary
 
-### R packages (24 total)
+### R packages (25 total)
 - **tidyverse:** dplyr, tidyr, purrr, stringr, ggplot2, readr, tibble
-- **Visualization:** gggenes, ggraph, gridExtra, viridis, RColorBrewer, scales, randomcoloR
+- **Visualization:** gggenes, ggraph, gridExtra, viridis, RColorBrewer, scales, randomcoloR, pheatmap
 - **Graph analysis:** igraph
 - **Data manipulation:** data.table
 - **Utilities:** glue, fs
@@ -76,7 +76,8 @@ required_packages <- c("dplyr", "tidyr", "purrr", "stringr", "ggplot2",
                        "gggenes", "tidyverse", "ggraph", "tibble",
                        "gridExtra", "viridis", "igraph", "pander",
                        "RColorBrewer", "scales", "randomcoloR", "glue",
-                       "fs", "data.table", "readr", "knitr", "rmarkdown")
+                       "fs", "data.table", "readr", "knitr", "rmarkdown",
+                       "pheatmap")
 all_installed <- sapply(required_packages, require, character.only = TRUE, quietly = TRUE)
 if (all(all_installed)) cat("All packages successfully installed!\n") else
   cat("Missing packages:\n"); print(names(all_installed)[!all_installed])
@@ -102,11 +103,11 @@ Rscript prepare.R               <config.yaml>
 # Step 0  — materialise the missing per-focal neighbor TSVs.
 bash    run_species.sh          <config.yaml>
 
-# Steps 1-5 — the analytical pipeline.
+# Steps 1-6 — the analytical pipeline.
 Rscript pipeline.R              <config.yaml>
 ```
 
-Working example config: `example.yaml` (template). A real worked-example input bundle (config + focal_meta TSV) lives under `examples/`.
+Working example config: `example.yaml` (template).
 
 ## Troubleshooting
 
@@ -137,7 +138,7 @@ Working example config: `example.yaml` (template). A real worked-example input b
 
 ## File dependencies
 
-The pipeline driver (`pipeline.R`) sources these R scripts (must be in the same directory):
+The pipeline driver (`pipeline.R`) sources these R scripts from the `R/` subdirectory:
 
 - `config.R` — YAML loader + `cfg_get` accessor
 - `model.R` — `target_layout` + `get_target` (file-path resolver)
@@ -151,7 +152,7 @@ The pipeline driver (`pipeline.R`) sources these R scripts (must be in the same 
 
 `prepare.R` is a separate driver that sources only `config.R` + `model.R`.
 
-The Step 0a / Step 0 bash + Python scripts live next to the R sources:
+The Step 0a / Step 0 bash + Python scripts live at the repo root, alongside the driver scripts (`prepare.R`, `pipeline.R`):
 
 - `build_genome_catalog.py`
 - `gff_to_genes.py` (imported by build_genome_catalog.py)

@@ -257,7 +257,7 @@ For each gene_member, this is its row + up to `±n_genes` flanking rows from the
 
 ## 4. Pipeline outputs — produced by Step 1 onward
 
-These are the model.R `# Output` targets: every file written by Steps 1–5 of `pipeline.R` (caches and final outputs alike). Detailed input/output specs live in **[STEPS.md](STEPS.md)** — one section per step. Quick reference:
+These are the model.R `# Output` targets: every file written by Steps 1–6 of `pipeline.R` (caches and final outputs alike). Detailed input/output specs live in **[STEPS.md](STEPS.md)** — one section per step. Quick reference:
 
 | Step | Output target key | On-disk path (relative to `{proj_dir}/`) | Header? | Brief |
 |---|---|---|---|---|
@@ -277,12 +277,12 @@ These are the model.R `# Output` targets: every file written by Steps 1–5 of `
 | 6 | `rep_path_df` | `step6_blocks/representative_path.tsv` | yes | Non-redundant trait-associated blocks (`block_uid`). |
 | 6 | `uid_path_df` | `step6_blocks/rep.tsv` | yes | Per-genome attribution for reps. |
 | 6 | — | `step6_blocks/rep_heatmap.pdf` | PDF | Block × genome presence/absence (when ≥ 2 reps and matrix ≥ 3×3). |
-| 5 | `parse_coarse_summary` | `step4_parse/coarse_recurring_operons.tsv` | yes | One row per `uid`. |
-| 5 | `parse_fine_summary` | `step4_parse/fine_isoform_priorities.tsv` | yes | One row per `uid_fine`. |
-| 5 | `parse_selected_coarse` | `step4_parse/selected_coarse.tsv` | yes | Coarse uids whose fine isoforms passed survival. |
-| 5 | `parse_selected_fine` | `step4_parse/selected_fine.tsv` | yes | Fine isoforms surviving `n_fine_genomes >= ceil(path_min_genomes * fine_coverage_ratio)`. |
-| 5 | `parse_fine_long` | `step4_parse/fine_long.tsv` | yes | Long-format per-gene table for the sampled isoforms. |
-| 5 | `parse_genome_paths_dir` | `step4_parse/genome_paths/fine_<uid_fine>_<genome>.tsv` | per-file | Bare gene-id lists per sampled (isoform, genome). |
+| 4 | `parse_coarse_summary` | `step4_parse/coarse_recurring_operons.tsv` | yes | One row per `uid`. |
+| 4 | `parse_fine_summary` | `step4_parse/fine_isoform_priorities.tsv` | yes | One row per `uid_fine`. |
+| 4 | `parse_selected_coarse` | `step4_parse/selected_coarse.tsv` | yes | Coarse uids whose fine isoforms passed survival. |
+| 4 | `parse_selected_fine` | `step4_parse/selected_fine.tsv` | yes | Fine isoforms surviving `n_fine_genomes >= ceil(path_min_genomes * fine_coverage_ratio)`. |
+| 4 | `parse_fine_long` | `step4_parse/fine_long.tsv` | yes | Long-format per-gene table for the sampled isoforms. |
+| 4 | `parse_genome_paths_dir` | `step4_parse/genome_paths/fine_<uid_fine>_<genome>.tsv` | per-file | Bare gene-id lists per sampled (isoform, genome). |
 | 5 | `parse_coarse_figures` | `step5_figures/coarse_operons_<fill_by>.pdf` + `02_by_component_coarse/` | PDFs | Global + per-component coarse plots, one per `fill_mode`. |
 | 5 | `parse_fine_figures` | `step5_figures/fine_operons_<fill_by>.pdf` + `03_by_component_fine/` | PDFs | Global + per-component fine plots, one per `fill_mode`. |
 

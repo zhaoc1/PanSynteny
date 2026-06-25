@@ -98,7 +98,7 @@ path_df <- run_step2_path_stitching(gene_neighbors)
 cat("\n[3/6] Step 3 : cross-genome consolidation (three granularity levels)...\n")
 # run_step3_consolidation (path.R) builds all six L1/L2/L3 frames, decorates
 # with small-ORF + truncation/fragmentation flags, writes the five
-# canonical-paths TSVs, and returns the three data frames. Step 5 (blocks)
+# canonical-paths TSVs, and returns the three data frames. Step 6 (blocks)
 # needs c_paths, collapsed_paths, c80s_coarse in memory.
 res <- run_step3_consolidation(path_df, c80_variants_mapping, focal_c80_df, cluster_80, short_gene_prevalence)
 c_paths <- res$c_paths

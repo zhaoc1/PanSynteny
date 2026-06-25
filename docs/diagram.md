@@ -6,7 +6,7 @@ The only YAML key consumed by more than one step is **`path.path_min_genomes`** 
 
 ---
 
-## ASCII data-flow
+## Data-flow
 
 ```text
 job.species_id ──────┬────────────────────────────────────────►  every step
@@ -15,7 +15,7 @@ data.data_dir ───────┤
                      │
 sources: (list) ─────│──────►┌─────────────────────────┐
 data.n_genes ────────│──┐    │ build_genome_catalog.py │
-                     │  │    │             (Step 0a)   │
+                     │  │    │        (Step 0a)        │
                      │  │    │  genes_info.tsv +       │
                      │  │    │  genome_toc.tsv +       │
                      │  │    │  <g>.genes in place     │
@@ -23,17 +23,18 @@ data.n_genes ────────│──┐    │ build_genome_catalog.py
                      │  │                 │ catalog (Step 0a out)
                      │  │                 ▼
                      ▼  │    ┌─────────────────────────┐
-data.focal_meta ────────│───►│   prepare.R    (Step 0) │
+data.focal_meta ────────│───►│   prepare.R   (Step 0)  │
 prepare.score_col ──────│───►│                         │
-prepare.inclusion_... ────│───►│  snapshot run_config;   │
+prepare.inclusion_... ──│───►│  snapshot run_config;   │
 prepare.focal_cutoff ───│───►│  process focal_meta;    │
                         │    │  list missing TSVs      │
                         │    └────────────┬────────────┘
                         │                 │ focal_meta cache + gene_list.tsv
                         │                 ▼
                         └───►┌─────────────────────────┐
-                             │ build_neighbor_lists.sh (Step 0) │
-                             │  → generate_neighbor_   │
+                             │ build_neighbor_lists.sh │
+                             |         (Step 0)        │
+                             │  → focal_neighbor_      │
                              │      list.sh            │
                              │  → get_neighbor.sh      │
                              │                         │
@@ -43,7 +44,7 @@ prepare.focal_cutoff ───│───►│  process focal_meta;    │
                                           ▼
                               ┌─────────────────────────┐
 neighbor.focal_min_genomes ──►│  neighbor.R  (Step 1)   │
-neighbor.focal_min_total_... ──►│  midas.R                │
+neighbor.focal_min_total_.. ─►│  midas.R                │
 neighbor.min_positions ──────►│                         │
 neighbor.upper_bound ────────►│  per-focal extraction   │
 neighbor.min_left_neighbors ─►│  + small-ORF labels     │
@@ -87,7 +88,6 @@ blocks.min_shared ───────────►│                       
                               └─────────────────────────┘
 
 job.proj_dir, data.* (paths) ──── consumed by model.R::target_layout(), used at every step
-                                  (path resolution; not analytic tuning)
 
 mwas.midas_dir (parked) ───── feeds the MWAS block in model.R; no reader in the current pipeline
 ```

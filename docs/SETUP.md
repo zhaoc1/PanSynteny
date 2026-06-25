@@ -88,17 +88,17 @@ Once the env is set up, the workflow is four ordered commands, all reading the s
 ```bash
 # Step 0a - build the unified genome catalog (genes_info.tsv + genome_toc.tsv;
 #           derives <g>.genes in place for prokka sources via gff_to_genes.py).
-python  build_genome_catalog.py <config.yaml>
+python build_genome_catalog.py <config.yaml>
 
 # Step 0  - snapshot the YAML, process focal_meta into the step1 cache,
 #           list any missing per-focal neighbor TSVs.
-Rscript prepare.R               <config.yaml>
+Rscript prepare.R <config.yaml>
 
 # Step 0  - materialise the missing per-focal neighbor TSVs.
-bash    build_neighbor_lists.sh <config.yaml>
+bash build_neighbor_lists.sh <config.yaml>
 
 # Steps 1-6 - the analytical pipeline.
-Rscript pipeline.R              <config.yaml>
+Rscript pipeline.R <config.yaml>
 ```
 
 Working example config: `example.yaml` (template).

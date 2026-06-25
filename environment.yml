@@ -47,7 +47,7 @@ dependencies:
   # System tools (if needed)
   - pandoc>=2.19
 
-  # Python tools — required by Step 0a (build_genome_catalog.py +
+  # Python tools - required by Step 0a (build_genome_catalog.py +
   # gff_to_genes.py). pyyaml parses <config.yaml>; gffutils backs the Prokka
   # GFF3 -> .genes conversion.
   - python>=3.10

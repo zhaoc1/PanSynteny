@@ -46,10 +46,10 @@ Every key is documented in [USER_GUIDE.md section Configuration](docs/USER_GUIDE
 **2. Run the four ordered commands** - all read the same config:
 
 ```bash
-python  build_genome_catalog.py my_run.yaml   # Step 0a - build the genome catalog from sources:
-Rscript prepare.R               my_run.yaml   # Step 0  - cache focal_meta, list missing neighbor TSVs
-bash    build_neighbor_lists.sh my_run.yaml   # Step 0  - materialise the neighbor TSVs
-Rscript pipeline.R              my_run.yaml   # Steps 1-6 - neighborhoods -> figures -> trait blocks
+python build_genome_catalog.py my_run.yaml   # Step 0a - build the genome catalog from sources:
+Rscript prepare.R my_run.yaml                # Step 0  - cache focal_meta, list missing neighbor TSVs
+bash build_neighbor_lists.sh my_run.yaml     # Step 0  - materialise the neighbor TSVs
+Rscript pipeline.R my_run.yaml               # Steps 1-6 - neighborhoods -> figures -> trait blocks
 ```
 
 **3. Read your outputs** under `{proj_dir}/`:

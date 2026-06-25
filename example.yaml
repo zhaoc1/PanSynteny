@@ -11,7 +11,7 @@ data:
   clusters_80_updated: "{midasdb_dir}/pangenomes/{species_id}/clusters_80_info_updated.tsv"  # copied into the local data_dir
   n_genes:             20                                                                    # max neighbors extracted each side of a focal gene along the contig (get_neighbor.sh)
 
-sources:         # consumed by build_genome_catalog.py (config.R ignores it). Single-source (Case 1) shown below; for multi-source + per-source local placeholders, see docs/USER_GUIDE.md §Case 2.
+sources:         # consumed by build_genome_catalog.py (config.R ignores it). Single-source (Case 1) shown below; for multi-source + per-source local placeholders, see docs/USER_GUIDE.md section Case 2.
   - name:        uhgg
     type:        midas
     genes_info:  "{midasdb_dir}/pangenomes/{species_id}/genes_info.tsv"

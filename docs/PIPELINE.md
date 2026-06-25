@@ -42,7 +42,7 @@ Created by `decorate_c80s_w_smallORFs()` in `parse.R`.
 
 ## Worked examples
 
-### Microslam cluster `3045` with two length variants
+### Cluster `3045` with two length variants
 
 | neighbor_c80_coarse | neighbor_c80_fine | centroid_80 | neighbor_gene_length |
 | --- | --- | --- | --- |
@@ -67,7 +67,7 @@ carries. That shared value is what makes per-focal grouping work.
 | Question | Group on |
 | --- | --- |
 | All rows in this coarse cluster (length variants collapsed) | `neighbor_c80_coarse` |
-| Did the same cluster show up at multiple lengths in one isoform? (split-gene check - see `decorate_c80s_w_truncation`) | `neighbor_c80_fine` |
+| Did the same cluster show up at multiple lengths in one isoform?  | `neighbor_c80_fine` |
 | This focal's row plus all small ORFs derived from its neighborhood | `centroid_80` |
 
 ## Granularity hierarchy
@@ -80,7 +80,7 @@ neighbor_c80_coarse   (cluster-scoped: length variants collapsed)
 neighbor_c80_fine     (variant-scoped: cluster + length-rank)
 ```
 
-For **microslam genes**, the top two are identical - only `neighbor_c80_fine`
+For **microSLAM genes**, the top two are identical - only `neighbor_c80_fine`
 adds info (the length-rank suffix).
 
 For **short ORFs**, the top column resolves the focal context that the

@@ -68,8 +68,8 @@ Most reruns are cheap because the expensive artifacts are `-s`-guarded. Knowing 
 
 ```bash
 python  build_genome_catalog.py <config.yaml>   # Step 0a - build the unified genome catalog from sources:
-Rscript prepare.R               <config.yaml>   # Step 0  - snapshot config, cache focal_meta, list missing TSVs
-bash    build_neighbor_lists.sh <config.yaml>   # Step 0  - materialise the missing neighbor TSVs
+Rscript prepare.R               <config.yaml>   # Step 0b - snapshot config, cache focal_meta, list missing TSVs
+bash    build_neighbor_lists.sh <config.yaml>   # Step 0c - materialise the missing neighbor TSVs
 Rscript pipeline.R              <config.yaml>   # Steps 1-6 - analytical pipeline
 ```
 
@@ -108,7 +108,7 @@ Catalog lives **per-run** under `proj_dir` so different `sources:` lists across 
 
 For `type: prokka` sources it converts each `<g>.gff -> <g>.genes` **in place** next to the GFF (idempotent on `-s`). For `type: midas` sources it trusts the midasdb's existing `.genes` files. **Duplicate `genome_id` across sources -> warn and stop** - the genome -> path map must be unambiguous.
 
-**Step 0 - `prepare.R`.** Four responsibilities:
+**Step 0b - `prepare.R`.** Four responsibilities:
 
 1. Snapshot `<config.yaml>` to [`run_config`](../R/model.R) (`{proj_dir}/step1_setup/run_config.yaml`) for provenance.
 2. Seed the local copy of `clusters_80_updated` from `data.clusters_80_updated` into [`clusters_80_updated`](../R/model.R) on first run (`overwrite = FALSE`); subsequent runs preserve hand edits. To refresh from the source, `rm` the local copy.
@@ -117,7 +117,7 @@ For `type: prokka` sources it converts each `<g>.gff -> <g>.genes` **in place** 
 
 Always overwrites - cheap to re-run.
 
-**Step 0 - `build_neighbor_lists.sh`.** Consumes `gene_list.tsv` (the missing-list from `prepare.R`); fans `focal_neighbor_list.sh` over each focal in parallel. `focal_neighbor_list.sh` joins the catalog `genes_info` (gene members of the focal) to `genome_toc` (each genome's `.genes` path) and calls `get_neighbor.sh` per gene member. Output: `{data_dir}/{species_id}/list_of_neighbors/<focal_c80>.tsv` (7 cols, no header). Per-focal idempotency via `-s "$outfile"`. No-op if `gene_list.tsv` is absent.
+**Step 0c - `build_neighbor_lists.sh`.** Consumes `gene_list.tsv` (the missing-list from `prepare.R`); fans `focal_neighbor_list.sh` over each focal in parallel. `focal_neighbor_list.sh` joins the catalog `genes_info` (gene members of the focal) to `genome_toc` (each genome's `.genes` path) and calls `get_neighbor.sh` per gene member. Output: `{data_dir}/{species_id}/list_of_neighbors/<focal_c80>.tsv` (7 cols, no header). Per-focal idempotency via `-s "$outfile"`. No-op if `gene_list.tsv` is absent.
 
 **Steps 1-4 - `pipeline.R`.** Reads the cached focal table that `prepare.R` produced. The driver consumes `focal_c80_df` as-is and does **not** apply any threshold of its own - that decision is owned by `prepare.R`. If the focal_meta cache is missing or any `is_focal` centroid still lacks a neighbor TSV, the driver aborts at startup with a pointer back to `prepare.R`.
 
@@ -225,7 +225,7 @@ sources:
 
 Local placeholders are scoped to their own source entry - `{ecor_dir}` defined under `ecor` is not visible to other sources. Globals (`{species_id}`, `{midasdb_dir}`, `{proj_dir}`) are expanded inside the local value too, so `ecor_dir: "{proj_dir}/inputs"` works.
 
-### `prepare` - Step 0 (`prepare.R`)
+### `prepare` - Step 0b (`prepare.R`)
 
 ```yaml
 prepare:
@@ -255,7 +255,7 @@ neighbor:
 
 `focal_min_genomes` is the per-focal recurrence cut applied throughout Step 1 (pattern survival, flanking coverage, orientation grouping). `focal_min_total_genomes` is a separate, larger floor on each focal's total cross-genome support - focals seen in fewer total genomes are dropped before pattern extraction begins.
 
-(The Step 0 parallelism knob `parallel_jobs` lives under `job:` - see [`job` - required](#job--required) above.)
+(The Step 0c parallelism knob `parallel_jobs` lives under `job:` - see [`job` - required](#job--required) above.)
 
 ### `path` - Step 3 (canonical operon consolidation)
 
@@ -487,8 +487,8 @@ A separate gap that remains worth tracking: Step 1's per-focal orientation is lo
 ```
 pangenome-operons-v2/
 ├── build_genome_catalog.py     # Step 0a: build genome_catalog/{genes_info,genome_toc}.tsv (entry)
-├── build_neighbor_lists.sh              # Step 0: materialise per-focal neighbor TSVs (entry)
-├── prepare.R                   # Step 0: snapshot YAML, process focal_meta, list missing TSVs
+├── build_neighbor_lists.sh              # Step 0c: materialise per-focal neighbor TSVs (entry)
+├── prepare.R                   # Step 0b: snapshot YAML, process focal_meta, list missing TSVs
 ├── pipeline.R                  # Steps 1-6: the driver - reads top-to-bottom
 ├── install_packages.R          # one-off: install the R package deps
 ├── scripts/                    # bash + Python helpers (self-locating; called by the entry scripts)
@@ -524,11 +524,11 @@ pangenome-operons-v2/
 
 | Knob | Section | Default | Where it bites | Effect |
 | --- | --- | --- | --- | --- |
-| `focal_meta` | `data` | - | Step 0 (`prepare.R`) | Absolute path to the user-provided focal-gene TSV. **Required.** |
-| `n_genes` | `data` | 20 | Step 0 (`get_neighbor.sh`, `grep -C`) | Max neighbours extracted each side of a focal along the contig. |
-| `score_col` | `prepare` | `cor_to_b` | Step 0 (`prepare.R`) | Trait-stat column the cutoffs apply to. One of `{cor_to_b, beta, ""}`. Empty = pass-through (focal_meta must already carry `is_focal`). |
-| `inclusion_cutoff` | `prepare` | 0.25 | Step 0 (`prepare.R`) | Minimum `\|score_col\|` to retain a gene in `focal_c80_df` at all. |
-| `focal_cutoff` | `prepare` | 0.5 | Step 0 (`prepare.R`) | Minimum `\|score_col\|` for a row to be flagged `is_focal = TRUE` and drive Step 1 neighbor extraction. |
+| `focal_meta` | `data` | - | Step 0b (`prepare.R`) | Absolute path to the user-provided focal-gene TSV. **Required.** |
+| `n_genes` | `data` | 20 | Step 0c (`get_neighbor.sh`, `grep -C`) | Max neighbours extracted each side of a focal along the contig. |
+| `score_col` | `prepare` | `cor_to_b` | Step 0b (`prepare.R`) | Trait-stat column the cutoffs apply to. One of `{cor_to_b, beta, ""}`. Empty = pass-through (focal_meta must already carry `is_focal`). |
+| `inclusion_cutoff` | `prepare` | 0.25 | Step 0b (`prepare.R`) | Minimum `\|score_col\|` to retain a gene in `focal_c80_df` at all. |
+| `focal_cutoff` | `prepare` | 0.5 | Step 0b (`prepare.R`) | Minimum `\|score_col\|` for a row to be flagged `is_focal = TRUE` and drive Step 1 neighbor extraction. |
 | `focal_min_genomes` | `neighbor` | 10 | Step 1 (multiple gates) | Per-focal recurrence cut. Lower = more rare neighborhoods survive. |
 | `focal_min_total_genomes` | `neighbor` | 30 | Step 1 (`parse_gene_neighbor`) | Min total focal coverage; focals with thinner support are dropped before pattern extraction. |
 | `min_positions` | `neighbor` | 5 | Step 1 (`compute_relative_positions`, `parse_gene_neighbor`) | Min operon size. Lower = include shorter neighborhoods. |

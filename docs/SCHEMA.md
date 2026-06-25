@@ -2,7 +2,7 @@
 
 The single source of truth for every file the pipeline reads or writes: where it lives, what columns it has, who writes it, who reads it, and any non-obvious semantics. Every entry below is keyed by the [model.R](../R/model.R) target name (where one exists) so you can grep both sides at once.
 
-**How this is organised.** Sections follow [model.R](../R/model.R)'s **consumer-based** Input / Output split (section 3 = `# Input` block, section 4 = `# Output` block). A file written by Step 0 (e.g., the focal_meta cache, the catalog files) lives under "Pipeline inputs" because that's how it's used downstream, even though it's produced upstream. The section 3 entries note the producer in each "Writer" row.
+**How this is organised.** Sections follow [model.R](../R/model.R)'s **consumer-based** Input / Output split (section 3 = `# Input` block, section 4 = `# Output` block). A file written by Steps 0a-0c (e.g., the focal_meta cache, the catalog files) lives under "Pipeline inputs" because that's how it's used downstream, even though it's produced upstream. The section 3 entries note the producer in each "Writer" row.
 
 For pipeline behaviour and run order, see [USER_GUIDE.md](USER_GUIDE.md). For per-step input/output logic, see [STEPS.md](STEPS.md). For c80-column semantics (coarse vs fine), see [PIPELINE.md](PIPELINE.md).
 
@@ -156,9 +156,9 @@ The genome_id derivation from gene_id is shared with `focal_neighbor_list.sh`: s
 
 ---
 
-## 3. Pipeline inputs - Step 0 caches and seeded copies
+## 3. Pipeline inputs - Step 0a-0c caches and seeded copies
 
-These are the model.R `# Input` targets: paths the analytical pipeline (and the Step 0 bash chain) **reads** during a run. They're produced upstream by `prepare.R`, `build_genome_catalog.py`, or `build_neighbor_lists.sh` - but from the consumer's perspective they are inputs to the work that follows. Paths reference [model.R](../R/model.R) target keys.
+These are the model.R `# Input` targets: paths the analytical pipeline (and the Step 0c bash chain) **reads** during a run. They're produced upstream by `prepare.R`, `build_genome_catalog.py`, or `build_neighbor_lists.sh` - but from the consumer's perspective they are inputs to the work that follows. Paths reference [model.R](../R/model.R) target keys.
 
 ### `run_config` - config snapshot
 

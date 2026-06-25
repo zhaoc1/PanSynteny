@@ -1,7 +1,7 @@
 # ------------------------------------------------------------------------------
 # prepare.R
 #
-# Step 0: input setup for the strain-aware operon pipeline.
+# Step 0b: input setup for the strain-aware operon pipeline.
 #
 # Four responsibilities:
 #   (1) Snapshot the input YAML to the project directory for provenance

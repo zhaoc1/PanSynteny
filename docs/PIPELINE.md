@@ -332,10 +332,10 @@ isoform.
 | Key | Used in | Purpose |
 | --- | --- | --- |
 | `species_id` | Step 0a onward | Selects which MIDAS pangenome to load and which species the catalog is scoped to |
-| `focal_meta` | Step 0 (`prepare.R`) | Absolute path to the user-provided focal-gene TSV |
+| `focal_meta` | Step 0b (`prepare.R`) | Absolute path to the user-provided focal-gene TSV |
 | `midasdb_dir` | Step 0a (`build_genome_catalog`), Step 1 onward (via `load_c80_tables`) | MIDAS reference DB root |
-| `data_dir` | Step 0a + Step 0 | Catalog + neighbor TSVs land under `<data_dir>/<species_id>/` |
-| `n_genes` | Step 0 (`get_neighbor.sh`) | Max neighbours per side around a focal |
+| `data_dir` | Step 0a + Step 0c | Catalog + neighbor TSVs land under `<data_dir>/<species_id>/` |
+| `n_genes` | Step 0c (`get_neighbor.sh`) | Max neighbours per side around a focal |
 | `sources` (list) | Step 0a (`build_genome_catalog`) | Declares each source's membership file + `.genes` location |
 | `focal_min_genomes` | Step 1 | Minimum genome support for a Step 1 neighborhood pattern |
 | `path_min_genomes` | Step 3, Step 4 | Minimum genome support to retain a canonical path; also the floor that `fine_coverage_ratio` is applied to |
@@ -347,7 +347,7 @@ isoform.
 
 ### Inclusion thresholds
 
-Owned by Step 0 (`prepare.R`) and YAML-controlled - not hardcoded in the driver. See [USER_GUIDE.md section `prepare`](USER_GUIDE.md) for the full schema. Two gates:
+Owned by Step 0b (`prepare.R`) and YAML-controlled - not hardcoded in the driver. See [USER_GUIDE.md section `prepare`](USER_GUIDE.md) for the full schema. Two gates:
 
 - `inclusion_cutoff` - minimum `|score_col|` for a gene to be retained in `focal_c80_df`.
 - `focal_cutoff` - minimum `|score_col|` to flag `is_focal = TRUE` (drives Step 1 neighbor extraction).

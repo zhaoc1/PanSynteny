@@ -7,16 +7,17 @@ All file paths below resolve through [`get_target()`](../R/model.R#L75) against 
 Stage order:
 
 1. **Step 0a** - build the unified genome catalog (`build_genome_catalog.py`)
-2. **Step 0** - focal selection + missing-neighbor enumeration (`prepare.R`), then materialise the missing neighbors (`build_neighbor_lists.sh`)
-3. Pre-Step driver setup (focal selection, reference tables, run inside `pipeline.R`)
-4. **Step 1** - per-focal neighborhoods -> small-ORF + length-variant labels
-5. **Step 2** - per-genome operon graphs -> maximal paths
-6. **Step 3** - cross-genome consolidation -> three granularity levels
-7. **Step 4** - summaries, fine-coverage selection, exemplar sampling, BLAST gene lists
-8. **Step 5** - gggenes figures (global + per-component)
-9. **Step 6** - focal block extraction + representative ranking (gated by `blocks.skip_block`)
+2. **Step 0b** - focal selection + missing-neighbor enumeration (`prepare.R`)
+3. **Step 0c** - materialise the missing neighbors (`build_neighbor_lists.sh`)
+4. Pre-Step driver setup (focal selection, reference tables, run inside `pipeline.R`)
+5. **Step 1** - per-focal neighborhoods -> small-ORF + length-variant labels
+6. **Step 2** - per-genome operon graphs -> maximal paths
+7. **Step 3** - cross-genome consolidation -> three granularity levels
+8. **Step 4** - summaries, fine-coverage selection, exemplar sampling, BLAST gene lists
+9. **Step 5** - gggenes figures (global + per-component)
+10. **Step 6** - focal block extraction + representative ranking (gated by `blocks.skip_block`)
 
-Steps 1-6 are one-line orchestrator calls inside [`pipeline.R`](../pipeline.R); the bodies live in the topic-specific helper files (`run_stepN_*` in `neighbor.R` / `graph.R` / `path.R` / `blocks.R` / `parse.R` / `plot.R`). Steps 0a and 0 are standalone scripts that run before `pipeline.R`.
+Steps 1-6 are one-line orchestrator calls inside [`pipeline.R`](../pipeline.R); the bodies live in the topic-specific helper files (`run_stepN_*` in `neighbor.R` / `graph.R` / `path.R` / `blocks.R` / `parse.R` / `plot.R`). Steps 0a, 0b, and 0c are standalone scripts that run before `pipeline.R`.
 
 ---
 
@@ -71,10 +72,10 @@ None directly; `sources:` declares everything. `length_col` defaults to 8 (UHGG 
 
 ---
 
-## STEP 0 - Focal selection + neighbor-TSV materialisation
+## STEP 0b - Focal selection + missing-neighbor enumeration
 
-**Drivers:** [`prepare.R`](../prepare.R), then [`build_neighbor_lists.sh`](../build_neighbor_lists.sh)
-**Helpers:** `config.R`, `model.R` (for prepare.R); [`focal_neighbor_list.sh`](../scripts/focal_neighbor_list.sh) + [`get_neighbor.sh`](../scripts/get_neighbor.sh) (for build_neighbor_lists.sh)
+**Driver:** [`prepare.R`](../prepare.R)
+**Helpers:** `config.R`, `model.R`
 
 ### Input
 
@@ -82,14 +83,13 @@ None directly; `sources:` declares everything. `length_col` defaults to 8 (UHGG 
   - **Minimum required columns** (all four): `focal_c80`, `focal_label`, `is_focal`, `gene_label`. (`gene_label` is your user-defined annotation/category - distinct from the `.genes`-file `gene_type` which is the GFF feature type.)
   - **Optional, consumed when present**: `cor_to_b`, `beta`, `sample_prevalence`, `trait`, `genome_counts`. Step 5's `fill_modes` for the corresponding mode is skipped (with a warning) if its backing column is absent. Step 6 (block extraction) is gated by `blocks.skip_block`.
   - **If `prepare.score_col` is set**, the column it names (e.g. `cor_to_b`) must be present - prepare.R applies the `|score_col|` thresholds and **overwrites `is_focal`** with a warning (use `prepare.score_col: ""` to preserve a hand-curated `is_focal`, e.g. when the meta carries context rows with `is_focal = FALSE` that should not drive Step 1 extraction).
-- `{proj_dir}/step1_setup/catalog_{genes_info,genome_toc}.tsv` from Step 0a (consumed by `build_neighbor_lists.sh` via `focal_neighbor_list.sh`, and by `load_c80_tables` in pipeline.R).
+- `{proj_dir}/step1_setup/catalog_genome_toc.tsv` from Step 0a - only the genome TOC is consulted here, to know which per-focal neighbor TSVs are still missing on disk.
 
 ### Output
 
 - [`run_config`](../R/model.R) - `{proj_dir}/step1_setup/run_config.yaml` - exact copy of the CLI-arg `<config.yaml>` for provenance.
 - [`focal_meta`](../R/model.R) target - `{proj_dir}/step1_setup/gene_meta_full.tsv` (filename kept for back-compat). The (possibly threshold-derived) cached focal table. **This is what pipeline.R reads.**
-- [`gene_list`](../R/model.R) - `{proj_dir}/step1_setup/gene_list.tsv`. One focal centroid id per line: the focals still missing their per-focal neighbor TSV. Removed if all are present.
-- `{data_dir}/{species_id}/list_of_neighbors/<focal_c80>.tsv` - 7-column, no-header per-focal neighbor TSVs (`gene_member, neighbor_gene_id, neighbor_contig_id, neighbor_gene_start, neighbor_gene_end, neighbor_gene_strand, neighbor_gene_type`). One per `is_focal` centroid.
+- [`gene_list`](../R/model.R) - `{proj_dir}/step1_setup/gene_list.tsv`. One focal centroid id per line: the focals still missing their per-focal neighbor TSV (consumed by Step 0c). Removed if all are present.
 
 ### Logic - `prepare.R`
 
@@ -100,6 +100,34 @@ None directly; `sources:` declares everything. `length_col` defaults to 8 (UHGG 
    - Else (empty `score_col`): pass through. The input must already carry `is_focal`; prepare.R errors out otherwise.
    - `write_delim` to `get_target("focal_meta")`. The R pipeline reads from there; the original input is never touched.
 3. **Enumerate missing.** For every `is_focal == TRUE` centroid, check whether `{data_dir}/{species_id}/list_of_neighbors/<focal_c80>.tsv` exists. Missing ids land in `gene_list.tsv`. If all present, the gene_list file is removed.
+
+### Tunables
+
+- `prepare.score_col` (default `cor_to_b`; `""` for pass-through)
+- `prepare.inclusion_cutoff` (default 0.25)
+- `prepare.focal_cutoff` (default 0.5)
+
+### Known caveats
+
+- **The `focal_meta` *key* names two different things.** `cfg_get(job_config, "focal_meta")` returns the YAML input path; `get_target("focal_meta")` returns the step1 cache path. Disambiguated by the access method.
+- **Empty `score_col` requires `is_focal` in the input.** If you forget both, prepare.R errors with a column-list of what was actually in `focal_meta`.
+- **Editing `focal_meta` invalidates the cache** - re-run `prepare.R`. (Editing `sources:` instead invalidates the catalog - re-run `build_genome_catalog` / Step 0a.)
+
+---
+
+## STEP 0c - Neighbor-TSV materialisation
+
+**Driver:** [`build_neighbor_lists.sh`](../build_neighbor_lists.sh)
+**Helpers:** [`focal_neighbor_list.sh`](../scripts/focal_neighbor_list.sh) + [`get_neighbor.sh`](../scripts/get_neighbor.sh)
+
+### Input
+
+- [`gene_list`](../R/model.R) - `{proj_dir}/step1_setup/gene_list.tsv` from Step 0b (the missing-focal list). If absent, Step 0c is a no-op.
+- `{proj_dir}/step1_setup/catalog_{genes_info,genome_toc}.tsv` from Step 0a (joined by `focal_neighbor_list.sh`: `genes_info` for the gene members of each focal, `genome_toc` for each genome's `.genes` path).
+
+### Output
+
+- `{data_dir}/{species_id}/list_of_neighbors/<focal_c80>.tsv` - 7-column, no-header per-focal neighbor TSVs (`gene_member, neighbor_gene_id, neighbor_contig_id, neighbor_gene_start, neighbor_gene_end, neighbor_gene_strand, neighbor_gene_type`). One per `is_focal` centroid.
 
 ### Logic - `build_neighbor_lists.sh`
 
@@ -113,16 +141,12 @@ None directly; `sources:` declares everything. `length_col` defaults to 8 (UHGG 
 
 ### Tunables
 
-- `prepare.score_col` (default `cor_to_b`; `""` for pass-through)
-- `prepare.inclusion_cutoff` (default 0.25)
-- `prepare.focal_cutoff` (default 0.5)
 - `data.n_genes` (default 20)
+- `job.parallel_jobs` - per-focal fan-out width (`xargs -P`)
 
 ### Known caveats
 
-- **The `focal_meta` *key* names two different things.** `cfg_get(job_config, "focal_meta")` returns the YAML input path; `get_target("focal_meta")` returns the step1 cache path. Disambiguated by the access method.
-- **Empty `score_col` requires `is_focal` in the input.** If you forget both, prepare.R errors with a column-list of what was actually in `focal_meta`.
-- **The per-focal output preserves an idempotency guard, but the catalog rebuild is unconditional.** Editing `sources:` invalidates the catalog - re-run `build_genome_catalog`. Editing `focal_meta` invalidates the cache - re-run `prepare.R`.
+- **The per-focal output preserves an idempotency guard, but the catalog rebuild (Step 0a) is unconditional.** Deleting a focal's `<focal_c80>.tsv` is the re-run signal for that focal; otherwise Step 0c skips it.
 
 ---
 
@@ -134,7 +158,7 @@ Before Step 1 runs, the driver loads three reference tables and filters them dow
 |---|---|---|
 | `cluster_80` | [`clusters_80_updated`](../R/model.R) (TSV from the midasdb) | One row per coarse centroid_80 cluster: cluster id, cluster gene length, genome prevalence. |
 | `gene_to_c80` | [`catalog_genes_info`](../R/model.R) (TSV - the unified catalog from Step 0a) joined to `cluster_80` | Maps each individual `gene_id` to its parent `centroid_80` and the parent's reference length / genome prevalence. **Covers all sources** (UHGG + ECOR + ...) - the union from `build_genome_catalog`. |
-| `focal_c80_df` | Built by Step 0 ([`prepare.R`](../prepare.R)) and read from [`focal_meta`](../R/model.R) | One row per candidate gene with an `is_focal` boolean. **Required:** `focal_c80`, `focal_label`, `is_focal`, `gene_label`. **Optional (carried through if present):** `cor_to_b`, `beta`, `sample_prevalence`, `trait`, `genome_counts`. The pipeline does not re-filter. |
+| `focal_c80_df` | Built by Step 0b ([`prepare.R`](../prepare.R)) and read from [`focal_meta`](../R/model.R) | One row per candidate gene with an `is_focal` boolean. **Required:** `focal_c80`, `focal_label`, `is_focal`, `gene_label`. **Optional (carried through if present):** `cor_to_b`, `beta`, `sample_prevalence`, `trait`, `genome_counts`. The pipeline does not re-filter. |
 
 The driver errors out at startup in two cases, both with a pointer to `Rscript prepare.R <config.yaml>`: (1) the cached `focal_meta` is not present on disk; (2) one or more `is_focal == TRUE` centroids still missing their per-focal neighbor TSVs under [`neighbor_list`](../R/model.R). The discovery + enumeration of missing TSVs lives in [`prepare.R`](../prepare.R), which writes the list to [`gene_list`](../R/model.R); `build_neighbor_lists.sh` materialises them; this driver only re-checks the contract.
 

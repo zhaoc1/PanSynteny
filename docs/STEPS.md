@@ -6,16 +6,15 @@ All file paths below resolve through [`get_target()`](../R/model.R#L75) against 
 
 Stage order:
 
-1. **Step 0a** - build the unified genome catalog (`build_genome_catalog.py`)
-2. **Step 0b** - focal selection + missing-neighbor enumeration (`prepare.R`)
-3. **Step 0c** - materialise the missing neighbors (`build_neighbor_lists.sh`)
-4. Pre-Step driver setup (focal selection, reference tables, run inside `pipeline.R`)
-5. **Step 1** - per-focal neighborhoods -> small-ORF + length-variant labels
-6. **Step 2** - per-genome operon graphs -> maximal paths
-7. **Step 3** - cross-genome consolidation -> three granularity levels
-8. **Step 4** - summaries, fine-coverage selection, exemplar sampling, BLAST gene lists
-9. **Step 5** - gggenes figures (global + per-component)
-10. **Step 6** - focal block extraction + representative ranking (gated by `blocks.skip_block`)
+- **Step 0a** - build the unified genome catalog (`build_genome_catalog.py`)
+- **Step 0b** - focal selection + missing-neighbor enumeration (`prepare.R`)
+- **Step 0c** - materialise the missing neighbors (`build_neighbor_lists.sh`)
+- **Step 1** - per-focal neighborhoods -> small-ORF + length-variant labels
+- **Step 2** - per-genome operon graphs -> maximal paths
+- **Step 3** - cross-genome consolidation -> three granularity levels
+- **Step 4** - summaries, fine-coverage selection, exemplar sampling, BLAST gene lists
+- **Step 5** - gggenes figures (global + per-component)
+- **Step 6** - focal block extraction + representative ranking (gated by `blocks.skip_block`)
 
 Steps 1-6 are one-line orchestrator calls inside [`pipeline.R`](../pipeline.R); the bodies live in the topic-specific helper files (`run_stepN_*` in `neighbor.R` / `graph.R` / `path.R` / `blocks.R` / `parse.R` / `plot.R`). Steps 0a, 0b, and 0c are standalone scripts that run before `pipeline.R`.
 
@@ -167,25 +166,27 @@ The driver errors out at startup in two cases, both with a pointer to `Rscript p
 ## STEP 1 - Per-focal neighborhoods -> small-ORF + length-variant labels
 
 **Driver section:** [pipeline.R:80-88](../pipeline.R#L80-L88) (one-line orchestrator call to [`run_step1_neighbor_extraction`](../R/neighbor.R#L798))
-**Helper files:** [neighbor.R](../R/neighbor.R), [midas.R](../R/midas.R)
+**Helper files:** [neighbor.R](../R/neighbor.R) (extraction + orientation), [midas.R](../R/midas.R) (labels)
 
-### Input
+Step 1 turns the raw per-focal flanking-gene TSVs into one clean, labeled `gene_neighbors` table - one row per *(focal, genome, neighbor position)* - that Step 2 stitches into per-genome operon paths. Along the way it assigns the synthetic small-ORF labels and the length-variant (`fine`) labels that the rest of the pipeline keys off.
+
+### What it consumes
 
 - `focal_c80_df` - derived from the cached [`focal_meta`](../R/model.R) (written by `prepare.R`). One row per focal `centroid_80`, with `c80_label` in {`pos`, `neg`} from the sign of `cor_to_b`. Renames `gene_id -> c80`.
 - Per-focal neighbor TSVs on disk under [`neighbor_list`](../R/model.R) (one `<focal_c80>.tsv` per focal). Each TSV has 7 columns: `gene_member`, `neighbor_gene_id`, `neighbor_contig_id`, `neighbor_gene_start`, `neighbor_gene_end`, `neighbor_gene_strand`, `neighbor_gene_type`. These are produced by `build_neighbor_lists.sh` (which fans `focal_neighbor_list.sh` and `get_neighbor.sh` over `gene_list.tsv`); the driver only reads them.
 - `gene_to_c80` - to map `neighbor_gene_id -> neighbor_c80_coarse` (and pull cluster-level gene length / prevalence).
 
-### Output
+### What it produces
 
-- `gene_neighbors` (in-memory, cached to RDS at [`neighbor_groups_rds`](../R/model.R#L37)). One row per (focal, genome, neighbor position), with both `neighbor_c80_coarse` (coarse) and `neighbor_c80_fine` (length-variant-aware) columns populated.
+- `gene_neighbors` (in-memory, cached to RDS at [`neighbor_groups_rds`](../R/model.R#L37)) - **the main output and the re-run gate**. One row per (focal, genome, neighbor position), with both `neighbor_c80_coarse` (coarse) and `neighbor_c80_fine` (length-variant-aware) columns populated. If this RDS exists, sub-stages (a) and (b) below are skipped; delete it to force re-extraction.
 - `short_gene_prevalence` (in-memory + cached RDS at [`short_gene_prevalence`](../R/model.R#L34)). Per-synthetic-c80 prevalence map for unannotated short ORFs, used downstream by Step 3's c80s builders.
 - `c80_variants_mapping` (in-memory + cached RDS at [`c80_variants_mapping`](../R/model.R#L35)). Per-`(neighbor_c80_coarse, neighbor_gene_length)` mapping to the variant-resolved `neighbor_c80_fine`, used downstream by Step 3.
 - Per-focal-per-genome shards on disk under [`neighbor_groups_by_genome`](../R/model.R#L38) - one TSV per `<focal_label>/<genome>/<focal_c80>.tsv`. These are the files that `load_neighbors_across_genomes()` reassembles.
 - Diagnostic figures under [`neighbor_figures`](../R/model.R#L56): `fig1`-`fig5` per focal (operon-by-gene, operon-by-c80, operon-size distribution, selected-by-gene, selected-by-prevalence).
 
-### Logic
+### The three sub-stages
 
-Three sub-stages, all gated on the existence of the cached RDS:
+They run in sequence. **(a)** per-focal extraction and **(b)** cross-genome assembly are skipped when the `gene_neighbors` RDS already exists (delete it to force re-extraction); **(c)** label attachment always re-runs on the loaded table.
 
 **(a) Per-focal extraction** - [`extract_and_write_per_focal_neighbors()`](../R/neighbor.R#L647)
 
@@ -195,7 +196,11 @@ For every focal in `focal_c80_df`, call [`parse_gene_neighbor()`](../R/neighbor.
 2. [`compute_relative_positions()`](../R/neighbor.R#L73) - parse the integer suffix from each `neighbor_gene_id` (Prokka convention), compute each neighbor's position relative to its focal, restrict to +/-`upper_bound` and to focals with >= `min_positions` neighbors.
 3. [`filter_by_flanking_coverage()`](../R/neighbor.R#L133) - keep only focals with sufficient flanking-neighbor support. Auto-selects between strict (left-and-right) and relaxed (left-or-right) based on whether at least `focal_min_genomes` focals satisfy the strict criterion.
 4. [`compute_operon_size()`](../R/neighbor.R#L104) - count per-focal operon size; gate.
-5. **First orient + extract pass** - [`orient_focal_gene_neighbors()`](../R/neighbor.R#L238) decides the canonical direction per focal from its immediate non-NA flanking pair (left-anchor vs right-anchor; reverse the path if `right_anchor < left_anchor`). [`extract_gene_neighbor_patterns()`](../R/neighbor.R#L324) then collapses identical position-by-position signatures into pattern groups (`group_excludeNA`, `group_includeNA`), keeping the dominant detailed pattern per broad group. Two diagnostic plots emit (`fig1`, `fig2`).
+5. **First orient + extract pass** - [`orient_focal_gene_neighbors()`](../R/neighbor.R#L238) decides the canonical direction per focal copy (`gene_member`) from its two immediate non-NA flanking anchors:
+   - `left_anchor` = the c80 of the single closest non-NA neighbor to the left of the focal (largest negative `relative_position`).
+   - `right_anchor` = the c80 of the single closest non-NA neighbor to the right of the focal (smallest positive `relative_position`).
+
+   Orientation is forward (`1L`) when `left_anchor <= right_anchor` (a lexicographic string compare of the two `centroid_80` ids) and reversed (`-1L`) otherwise; the chosen direction is then applied by flipping `relative_position`. NA / unannotated small-ORF neighbors are skipped when walking outward to find each anchor, so direction keys off the nearest *annotated* clusters; a copy lacking a non-NA neighbor on either side is dropped (with a `message()`). [`extract_gene_neighbor_patterns()`](../R/neighbor.R#L324) then collapses identical position-by-position signatures into pattern groups (`group_excludeNA`, `group_includeNA`), keeping the dominant detailed pattern per broad group. Two diagnostic plots emit (`fig1`, `fig2`).
 6. [`find_most_prevalent_operon_size()`](../R/plot.R#L44) selects the dominant operon size; emit `fig3`.
 7. **Second orient + extract pass** - re-runs orientation + pattern extraction on the subset of focals matching the dominant operon size, producing tighter groupings. Two more plots (`fig4`, `fig5`).
 8. Filter neighbor groups to those with >= `focal_min_genomes` or >= `min_group_proportion` (default 0.05) of total focal coverage. Warn if surviving groups cover < `coverage_warn_threshold` (default 0.8) of total. Emit a per-focal RDS under [`neighbor_groups_by_focal`](../R/model.R#L39).

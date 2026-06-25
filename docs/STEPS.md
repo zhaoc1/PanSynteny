@@ -241,7 +241,7 @@ From the `neighbor` and `plot` sections of the YAML:
 
 ## STEP 2 - Per-genome operon graphs -> maximal paths
 
-**Driver section:** [pipeline.R:91-95](../pipeline.R#L91-L95) (one-line orchestrator call to [`run_step2_path_stitching`](../R/graph.R#L884))
+**Driver section:** [pipeline.R:91-95](../pipeline.R#L91-L95) (one-line orchestrator call to [`run_step2_path_stitching`](../R/graph.R#L912))
 **Helper file:** [graph.R](../R/graph.R)
 
 Step 2 is where individual focal neighborhoods stop being "lists of genes near a focal" and become **actual operon paths**. It walks each genome's neighborhoods as a directed graph and enumerates every maximal gene chain, so after this step an operon is a *path* - one row per per-genome occurrence - not a per-focal list.
@@ -263,12 +263,12 @@ Step 2 is where individual focal neighborhoods stop being "lists of genes near a
 
 ### The logic - one per-genome loop
 
-Single orchestrator: [`stitch_paths_across_focal_genes()`](../R/graph.R#L283) iterates **genome by genome** - no cross-genome edges are ever created; that is deferred to Step 3. For each genome:
+Single orchestrator: [`stitch_paths_across_focal_genes()`](../R/graph.R#L299) iterates **genome by genome** - no cross-genome edges are ever created; that is deferred to Step 3. For each genome:
 
 1. **Re-derive chromosomal position.** Within each focal copy (`gene_member`), sort neighbors by `neighbor_gene_start`, locate the focal's own row (`anchor_index = match(gene_member, neighbor_gene_id)`), and set `position = row_number - anchor_index`. **This overrides Step 1's focal-relative orientation** - every `gene_member` in the genome now shares one *chromosomal* frame (path direction is genome-relative, not focal-relative).
 2. **Build edges** (pos/neg separately) via [`make_positional_edges()`](../R/graph.R#L101): within each focal copy each neighbor points to the next in position order (`to = lead(...)`). Self-loops dropped; duplicate edges kept distinct. Edges encode adjacency in the *observed (filtered)* neighborhood, so an edge jumps any gap left by an upstream-filtered gene.
 3. **Aggregate edge support.** Per `(from, to, path_type)`, count distinct supporting `gene_member`s and list them -> `edge_support`.
-4. **Enumerate maximal paths** via [`get_maximal_paths_by_type()`](../R/graph.R#L171): build a directed graph, **hard-error if it is not a DAG** (a cycle signals a real upstream problem such as a tandem `A -> B -> A`), split into weakly connected components, and DFS from every in-degree-0 source to every out-degree-0 sink. *Every* source-to-sink path is returned (not just the longest) - cheap for chain-shaped neighborhoods, but exponential in a densely branched graph.
+4. **Enumerate maximal paths** via [`get_maximal_paths_by_type()`](../R/graph.R#L187): build a directed graph, **hard-error if it is not a DAG** (a cycle signals a real upstream problem such as a tandem `A -> B -> A`), split into weakly connected components, and DFS from every in-degree-0 source to every out-degree-0 sink. *Every* source-to-sink path is returned (not just the longest) - cheap for chain-shaped neighborhoods, but exponential in a densely branched graph.
 5. **Render two label views.** Map each path's node ids to `c80_path_coarse` and `c80_path_fine` (plus endpoint clusters). Both are kept so downstream length-sensitive analyses don't have to re-derive either.
 6. **Stamp per-genome provenance, accumulate, and `bind_rows` across genomes.**
 
@@ -289,41 +289,46 @@ None at this stage. Inherits from Step 1.
 ## STEP 3 - Cross-genome consolidation -> three granularity levels
 
 **Driver section:** [pipeline.R:98-106](../pipeline.R#L98-L106) (orchestrator call to [`run_step3_consolidation`](../R/path.R#L425))
-**Helper files:** [graph.R](../R/graph.R), [path.R](../R/path.R), [parse.R](../R/parse.R) (decorators)
+**Helper files:** [graph.R](../R/graph.R) (canonicalization + components), [path.R](../R/path.R) (expansions), [parse.R](../R/parse.R) (decorators)
 
-### Input
+Step 3 is the analytical core: it consolidates the per-genome paths from Step 2 into **canonical operons**, emitted at three granularity levels with three stable IDs that all downstream code joins on (never on path strings). Unlike Steps 1-2, it has **no on-disk cache gate** - it always re-runs.
 
-- `path_df` from Step 2 (with `path_genome_comp` key applied).
-- `c80_variants_mapping`, `focal_c80_df` (read from [`focal_meta`](../R/model.R)), `cluster_80`, `short_gene_prevalence` from earlier driver setup / Step 1.
+### What it consumes
 
-### Output
+- `path_df` from Step 2 (with the `path_genome_comp` key applied) - one row per per-genome maximal path.
+- `c80_variants_mapping`, `focal_c80_df` (read from [`focal_meta`](../R/model.R)), `cluster_80`, `short_gene_prevalence` - from the pre-step driver setup / Step 1, for labels and metadata.
 
-Five TSVs are written to `step3_path/`. They split into three granularity **levels**:
+### What it produces
 
-| Level | Path-level table | Per-gene table | Purpose |
-|---|---|---|---|
-| L1 - coarse / canonical | [`canonical_paths`](../R/model.R#L43) | [`canonical_paths_c80s`](../R/model.R#L46) | One row per surviving canonical operon (coarse). |
-| L2 - per-isoform | [`canonical_paths_fine`](../R/model.R#L44) | [`canonical_paths_fine_c80s`](../R/model.R#L47) | One row per length-variant isoform within a canonical. |
-| L3 - per-genome | [`canonical_paths_per_genome`](../R/model.R#L45) | _(none - already gene-level)_ | One row per `(canonical, contributing genome)` with full attribution. |
+Five TSVs under `step3_path/`, at three granularity **levels** (downstream code joins on the IDs, never the path strings):
 
-### Logic
+| Level | Path-level table | Per-gene table | ID | Purpose |
+|---|---|---|---|---|
+| L1 - coarse / canonical | [`canonical_paths`](../R/model.R#L43) | [`canonical_paths_c80s`](../R/model.R#L46) | `uid` | One row per surviving canonical operon (length variants collapsed). |
+| L2 - per-isoform | [`canonical_paths_fine`](../R/model.R#L44) | [`canonical_paths_fine_c80s`](../R/model.R#L47) | `uid_fine` | One row per length-variant isoform within a canonical. |
+| L3 - per-genome | [`canonical_paths_per_genome`](../R/model.R#L45) | _(none - already gene-level)_ | carries `uid`/`uid_fine` | One row per `(canonical, contributing genome)` with full attribution. |
 
-Eight stages.
+- `uid = "cmp{joint_component_ids}-{path_type}-{canonical_path_id}-ng{n_genomes}"`
+- `uid_fine = "{uid}-iso{isoform_rank}-ngf{n_fine_genomes}"` - strip `-iso\d+-ngf\d+$` to recover the parent `uid`.
 
-**1. [`collapse_paths_across_genomes()`](../R/graph.R#L423)**
+### The logic - eight stages
+
+**1. [`collapse_paths_across_genomes()`](../R/graph.R#L439)**
 Groups `path_df` on `(c80_path_coarse, path_length, path_type)`. One row per coarse operon shape per type. Records `n_genomes`, `neighbor_genomes` (`;`-joined), and `per_genome_path_w_ids` (`;`-joined `path_genome_comp`s - the provenance pointer back to the per-genome paths). Direction is **not** canonicalized here (e.g., `A->B->C` vs `C->B->A` remain two rows).
 
-**2. [`generate_canonical_path()`](../R/graph.R#L538)**
-Applies [`normalize_path()`](../R/graph.R#L470) (lex-min of forward vs reverse, computed on a *cleaned* token vector - synthetic small-ORF tokens stripped, adjacent duplicates collapsed via [`clean_for_orientation()`](../R/graph.R#L446); the chosen direction is then applied to the original full vector) to every row, assigning a surrogate `canonical_path_id`. Aggregates direction-mirror rows by summing `n_genomes` and concatenating provenance. Applies the `path_min_genomes` gate. **This is the survival cut for an operon** - anything below `path_min_genomes` is dropped from L1 onward.
+**2. [`generate_canonical_path()`](../R/graph.R#L560)**
+Applies [`normalize_path()`](../R/graph.R#L492) (lex-min of forward vs reverse, computed on a *cleaned* token vector - synthetic small-ORF tokens stripped, adjacent duplicates collapsed via [`clean_for_orientation()`](../R/graph.R#L462); the chosen direction is then applied to the original full vector) to every row, assigning a surrogate `canonical_path_id`. Aggregates direction-mirror rows by summing `n_genomes` and concatenating provenance. Applies the `path_min_genomes` gate. **This is the survival cut for an operon** - anything below `path_min_genomes` is dropped from L1 onward.
 
-**3. [`compute_joint_components()`](../R/graph.R#L617)**
-Builds an undirected, type-collapsed gene-level graph from all canonical paths and computes connected components. Returns a `(node, joint_component_id)` map - every centroid_80 that appears in any canonical path is grouped with every other c80 it's transitively adjacent to anywhere across the species-level pangenome. Type info is intentionally discarded (a hub gene that appears in both a `pos` and a `neg` path bridges them into one component).
+**3. [`compute_joint_components()`](../R/graph.R#L639)**
+Builds an undirected, type-collapsed gene-level graph from all canonical paths and computes connected components, returning a `(node, joint_component_id)` map. Every centroid_80 in any canonical path is grouped with every c80 it is transitively adjacent to anywhere across the species pangenome. Two things are intentionally kept out of the graph:
+- **Type info** - dropped before building the undirected graph, so a hub gene appearing in both a `pos` and a `neg` path bridges them into one component.
+- **Synthetic small-ORF tokens** - stripped (via the same `clean_for_orientation` rule) inside [`get_edges_from_paths()`](../R/graph.R#L115) before edges are formed, so a per-focal synthetic label reused across two unrelated paths can no longer bridge them into one component. Because the strip acts on the token vector, real genes that flanked a small ORF stay directly adjacent (`A -> _s -> B` => `A -> B`), so no component is fragmented. The stored canonical path string keeps its small ORFs.
 
-**4. [`decorate_paths_with_components()`](../R/graph.R#L680)**
-For each canonical path, look up the `joint_component_id` of every gene token and concatenate the unique values into a string `joint_component_ids` column. In practice each canonical path lives in exactly one component; multi-component strings only arise when a gene was lost from the map.
+**4. [`decorate_paths_with_components()`](../R/graph.R#L702)**
+For each canonical path, look up the `joint_component_id` of every **real** gene token and concatenate the unique values into the `joint_component_ids` string column. Synthetic small-ORF tokens are excluded here too (matching stage 3), so they cannot leak `NA` into the string / `uid`. In practice each canonical path lives in exactly one component; multi-component strings only arise when a gene was lost from the map.
 
-**5. [`orient_paths_within_component()`](../R/graph.R#L833)**
-Within each joint component, pick the longest path (by *cleaned* length) as direction reference and flip every other path to maximize forward-substring overlap against the reference (via [`max_overlap()`](../R/graph.R#L378)). Result: paths in a component all read left-to-right in a mutually consistent direction. Direction is **only** consistent within a component; the absolute reference direction is biology-agnostic (inherited from `normalize_path`'s lex rule). See the function's docstring for edge cases (longest-path tie, zero-overlap, palindromic, single-gene bridge).
+**5. [`orient_paths_within_component()`](../R/graph.R#L861)**
+Within each joint component, pick the longest path (by *cleaned* length) as direction reference and flip every other path to maximize forward-substring overlap against the reference (via [`max_overlap()`](../R/graph.R#L394)). Result: paths in a component all read left-to-right in a mutually consistent direction. Direction is **only** consistent within a component; the absolute reference direction is biology-agnostic (inherited from `normalize_path`'s lex rule). See the function's docstring for edge cases (longest-path tie, zero-overlap, palindromic, single-gene bridge).
 
 **6. Bake `uid`** (inside [`run_step3_consolidation`](../R/path.R), after the within-component re-orientation)
 `uid = "cmp{joint_component_ids}-{path_type}-{canonical_path_id}-ng{n_genomes}"`. Self-describing primary key for the canonical (L1) table.
@@ -339,7 +344,7 @@ For each surviving canonical, walk the provenance chain `canonical_path_id -> co
 
 [`decorate_c80s_w_smallORFs()`](../R/parse.R#L95) - decode synthetic small-ORF labels into queryable `is_smallORF`, `centroid_80`, `smallORF_type`, and per-operon `n_smallORFs` / `n_focal` / `dist_to_smallORFs`. Run on both coarse and fine, with `group_key = "uid"` and `"uid_fine"` respectively.
 
-[`decorate_c80s_w_truncation()`](../R/parse.R#L181) - fine only. Adds:
+[`decorate_c80s_w_truncation()`](../R/parse.R#L188) - fine only. Adds:
 - `is_truncated` (per row) when `neighbor_gene_length < truncation_cutoff * neighbor_c80_length_coarse`
 - `truncate_ratio` (per row), floor-truncated to 3 decimals
 - `n_truncated` (per-isoform broadcast)
@@ -361,8 +366,8 @@ From `path`:
 
 ### Known caveats
 
-- **Hub-gene mega-components** ([`compute_joint_components`](../R/graph.R#L617)). A promiscuous regulator or ribosomal gene can fuse many unrelated operons into one component. No automated flag - sanity-check component sizes if results look unexpectedly merged.
-- **Mixed-type warning in [`generate_canonical_path`](../R/graph.R#L538)** is emitted but the diagnostic data is built and discarded; if the invariant is violated, the subsequent `summarise(path_type = unique(path_type))` aborts with a length-mismatch instead.
+- **Hub-gene mega-components** ([`compute_joint_components`](../R/graph.R#L639)). A promiscuous *real* regulator or ribosomal gene can still fuse many unrelated operons into one component. (Synthetic small-ORF tokens no longer do - they are stripped before the graph is built; see stage 3.) No automated flag - sanity-check component sizes if results look unexpectedly merged.
+- **Mixed-type warning in [`generate_canonical_path`](../R/graph.R#L560)** is emitted but the diagnostic data is built and discarded; if the invariant is violated, the subsequent `summarise(path_type = unique(path_type))` aborts with a length-mismatch instead.
 - **`n_genomes` double-counts** in `generate_canonical_path` if any genome carries both directions of the same operon (rare).
 - **Mixed separators are inherited:** `collapsed_path_id` is comma-separated, `neighbor_genomes` is semicolon-separated. Not harmonized.
 
@@ -371,7 +376,7 @@ From `path`:
 
 ## STEP 4 + STEP 5 - Summaries, fine-only BLAST sampler, gggenes plots
 
-**Driver section:** [pipeline.R:109-129](../pipeline.R#L109-L129) (Step 4 / Step 5 orchestrator calls - [`run_step4_parse`](../R/parse.R#L657) and [`run_step5_figures`](../R/plot.R#L652))
+**Driver section:** [pipeline.R:109-129](../pipeline.R#L109-L129) (Step 4 / Step 5 orchestrator calls - [`run_step4_parse`](../R/parse.R#L664) and [`run_step5_figures`](../R/plot.R#L652))
 **Helper files:** [parse.R](../R/parse.R) (data prep), [plot.R](../R/plot.R) (plotters)
 
 The terminal post-processing block, split across two orchestrators: [`run_step4_parse`](../R/parse.R) (summaries, fine-coverage selection sets, exemplar-genome sampling, per-(isoform, genome) BLAST gene-id files) and [`run_step5_figures`](../R/plot.R) (multi-fill gggenes plots - global and per-joint-component, faceted by `updated_path_type`). Both are designed to stay re-runnable in isolation: the three Step-3 TSVs (Step 4) and the four selection-and-c80s TSVs (Step 5) are loaded at the call site in [pipeline.R](../pipeline.R) and passed in as explicit arguments, so the helper functions themselves contain no `read_delim` calls.
@@ -391,7 +396,7 @@ In-memory from Step 1:
 - `coarse_summary` / `fine_summary` (in-memory). One row per `uid` and per `uid_fine` respectively, with per-operon counts (`n_genes`, `n_smallORFs`, `n_focal`, `n_truncated`, `n_fragmented_c80s`) and a `coarse_path_string` / `fine_path_string` rendering. No filter is applied inside the summarizer; the caller filters.
 - `selected_fine` (in-memory). Fine isoforms surviving `n_fine_genomes >= ceiling(path_min_genomes * fine_coverage_ratio)`. The selection set for everything downstream in this block.
 - `selected_coarse` (in-memory). `coarse_summary %>% semi_join(selected_fine, by = "uid")` - the coarse uids whose fine isoforms made it through.
-- `fine_long` (in-memory). Long-format per-gene table, one row per gene of each sampled `(uid_fine, neighbor_genome)`. Built in two stages by [`sample_genome_from_fine_paths`](../R/parse.R#L378) (12 columns) and then [`enrich_fine_long`](../R/parse.R#L463) (joins per-isoform context from `c80s_fine`).
+- `fine_long` (in-memory). Long-format per-gene table, one row per gene of each sampled `(uid_fine, neighbor_genome)`. Built in two stages by [`sample_genome_from_fine_paths`](../R/parse.R#L385) (12 columns) and then [`enrich_fine_long`](../R/parse.R#L470) (joins per-isoform context from `c80s_fine`).
   - **Sampler output (12 cols):** `uid_fine`, `neighbor_genome`, `position_in_path`, `gene_id`, `neighbor_c80_coarse`, `neighbor_c80_fine`, `neighbor_contig_id`, `neighbor_gene_start`, `neighbor_gene_end`, `neighbor_gene_strand`, `neighbor_gene_type`, `neighbor_gene_length` (per-gene observed length from `gene_neighbors`).
   - **Enrichment adds** the contiguous range `uid_fine:centroid_80` from `c80s_fine`, minus three columns dropped to avoid collisions: `neighbor_c80_coarse` and `neighbor_c80_fine` (already present, identical values per joined row), and `neighbor_gene_length` (intentionally not merged - the c80s_fine version is per-isoform consensus length, not per-gene observed; same name, different semantics).
   - **Net added columns:** `n_fine_genomes`, `neighbor_c80_length_coarse`, `genome_prevalence`, `sample_prevalence`, `cor_to_b`, `focal_label`, `beta`, `trait`, `genome_counts`, `is_focal`, `is_smallORF`, `smallORF_type`, `n_smallORFs`, `n_focal`, `dist_to_smallORFs`, `is_truncated`, `truncate_ratio`, `n_truncated`, `is_fragmented`, `fragmented_c80s`, `n_fragmented_c80s`, `centroid_80_genome_counts`, `centroid_80`.
@@ -402,21 +407,21 @@ In-memory from Step 1:
 
 Six stages.
 
-**1. Summaries.** [`summarize_coarse_operons()`](../R/parse.R#L253) and [`summarize_fine_isoforms()`](../R/parse.R#L310) roll up the decorated c80s tables to one row per operon / isoform. Both are filter-free - the carry-through includes only the columns needed for downstream sampling and plotting (notably `uid` is carried into `fine_summary` so the post-hoc coarse-summary merge can group fine isoforms by their coarse parent without parsing `uid_fine` strings).
+**1. Summaries.** [`summarize_coarse_operons()`](../R/parse.R#L260) and [`summarize_fine_isoforms()`](../R/parse.R#L317) roll up the decorated c80s tables to one row per operon / isoform. Both are filter-free - the carry-through includes only the columns needed for downstream sampling and plotting (notably `uid` is carried into `fine_summary` so the post-hoc coarse-summary merge can group fine isoforms by their coarse parent without parsing `uid_fine` strings).
 
 The driver also enriches `coarse_summary` with isoform-mapping columns post-hoc - `n_isoforms_raw` (from `fine_summary`), and `n_isoforms_filtered` / `n_coarse_genome_filtered` / `uid_fine_list` (from `selected_fine`, available after stage 2). `coarse_summary$neighbor_genomes` is intentionally not carried - genome-level traceback is a fine-isoform concern.
 
 **2. Selection.** `path_min_genomes <- cfg_get(job_config, "path_min_genomes")` and `ratio <- cfg_get(job_config, "fine_coverage_ratio")`, then `selected_fine <- fine_summary %>% filter(n_fine_genomes >= ceiling(path_min_genomes * ratio))`. The example sets `ratio = 0.25` (permissive); historical default `0.5` reproduces the half-coverage rule (an isoform must have at least half as many supporting genomes as the canonical-path survival threshold). `ceiling` (not `floor`) keeps the bar from dropping below the configured fraction on odd `path_min_genomes`.
 
-**3. Fine-only sampling.** [`sample_genome_from_fine_paths()`](../R/parse.R#L378). Draws **one** random genome per surviving fine isoform (no adaptive variation by isoform count). `set.seed` is called once (with `seed` from YAML `parse`, default 616) for reproducibility, then `group_by(uid_fine) %>% slice_sample(n = 1)`. The chosen `gene_path_canonical` is exploded by `unnest_longer` to one row per gene; `position_in_path` is recorded; per-gene metadata (`neighbor_c80_coarse`, `neighbor_c80_fine`, `neighbor_contig_id`, `neighbor_gene_start`, `neighbor_gene_end`, `neighbor_gene_strand`, `neighbor_gene_type`, `neighbor_gene_length`) is merged from a deduped `gene_neighbors` lookup (deduped on `neighbor_gene_id` to prevent row explosion at join time).
+**3. Fine-only sampling.** [`sample_genome_from_fine_paths()`](../R/parse.R#L385). Draws **one** random genome per surviving fine isoform (no adaptive variation by isoform count). `set.seed` is called once (with `seed` from YAML `parse`, default 616) for reproducibility, then `group_by(uid_fine) %>% slice_sample(n = 1)`. The chosen `gene_path_canonical` is exploded by `unnest_longer` to one row per gene; `position_in_path` is recorded; per-gene metadata (`neighbor_c80_coarse`, `neighbor_c80_fine`, `neighbor_contig_id`, `neighbor_gene_start`, `neighbor_gene_end`, `neighbor_gene_strand`, `neighbor_gene_type`, `neighbor_gene_length`) is merged from a deduped `gene_neighbors` lookup (deduped on `neighbor_gene_id` to prevent row explosion at join time).
 
 Sampler output is 12 columns. Sample-level columns (`uid_fine`, `neighbor_genome`) repeat across the gene rows. Direction is canonical because the explode reads `gene_path_canonical` (already flipped by `expand_canonical_paths_per_genome` via the L2 `needs_flip` flag); `position_in_path` is therefore the 1-indexed canonical position. The full path string is not kept on the output - reconstruct it from `(gene_id, position_in_path)` per sample if needed. Per-gene coordinates (contig + start + end + strand) support nucleotide sequence extraction for BLAST workflows.
 
 Coarse-level BLAST hits are produced **post-hoc**, not by this block: aggregate fine BLAST results on `sub("-iso.*", "", uid_fine)` to recover per-`uid` coarse hits.
 
-**4. Per-isoform context enrichment.** [`enrich_fine_long(fine_long, c80s_fine)`](../R/parse.R#L463). Left-joins the per-(uid_fine, c80) annotations from `c80s_fine` onto `fine_long`, bringing in trait stats (`beta`, `cor_to_b`, `is_focal`), per-isoform-broadcast counts (`n_focal`, `n_smallORFs`, `n_truncated`, `n_fragmented_c80s`), small-ORF and truncation flags, and `centroid_80`. Join key is `(uid_fine, position_in_path)` - `c80s_fine` doesn't carry a position column, so the helper derives it via `row_number()` within `uid_fine` (rows are in canonical order by construction). Three columns are dropped from the c80s_fine side before joining: `neighbor_c80_coarse` / `neighbor_c80_fine` (already in fine_long, hygiene) and `neighbor_gene_length` (semantically distinct - sampler version is per-gene observed; c80s_fine version is per-isoform consensus). A `stopifnot` asserts no row multiplication.
+**4. Per-isoform context enrichment.** [`enrich_fine_long(fine_long, c80s_fine)`](../R/parse.R#L470). Left-joins the per-(uid_fine, c80) annotations from `c80s_fine` onto `fine_long`, bringing in trait stats (`beta`, `cor_to_b`, `is_focal`), per-isoform-broadcast counts (`n_focal`, `n_smallORFs`, `n_truncated`, `n_fragmented_c80s`), small-ORF and truncation flags, and `centroid_80`. Join key is `(uid_fine, position_in_path)` - `c80s_fine` doesn't carry a position column, so the helper derives it via `row_number()` within `uid_fine` (rows are in canonical order by construction). Three columns are dropped from the c80s_fine side before joining: `neighbor_c80_coarse` / `neighbor_c80_fine` (already in fine_long, hygiene) and `neighbor_gene_length` (semantically distinct - sampler version is per-gene observed; c80s_fine version is per-isoform consensus). A `stopifnot` asserts no row multiplication.
 
-**5. BLAST gene lists.** [`write_blast_gene_lists()`](../R/parse.R#L493). Long-format consumer: groups the enriched `fine_long` by `(uid_fine, neighbor_genome)`, sorts by `position_in_path`, and writes one TSV per group. The writer reads only `(uid_fine, neighbor_genome, position_in_path, gene_id)` - extra enrichment columns ride along harmlessly. This is the last stage of `run_step4_parse`; the figure-rendering stage below is owned by Step 5.
+**5. BLAST gene lists.** [`write_blast_gene_lists()`](../R/parse.R#L500). Long-format consumer: groups the enriched `fine_long` by `(uid_fine, neighbor_genome)`, sorts by `position_in_path`, and writes one TSV per group. The writer reads only `(uid_fine, neighbor_genome, position_in_path, gene_id)` - extra enrichment columns ride along harmlessly. This is the last stage of `run_step4_parse`; the figure-rendering stage below is owned by Step 5.
 
 **6. Step 5 - gggenes figures.** [`run_step5_figures()`](../R/plot.R#L652) wires four plotters at global and per-component scope: [`plot_coarse_operons()`](../R/plot.R#L404) and [`plot_fine_operons()`](../R/plot.R#L456) (one PDF per `fill_by` mode at the global level), [`plot_coarse_operons_by_component()`](../R/plot.R#L501) and [`plot_fine_operons_by_component()`](../R/plot.R#L556) (one PDF per `(joint_component_id, fill_by)` under `02_by_component_coarse/` and `03_by_component_fine/`, faceted by `updated_path_type`). Each plotter consumes its summary as a `semi_join` filter on `uid` / `uid_fine`. The shared layout helper [`.layout_operon_tracks()`](../R/plot.R#L245) computes per-track positions and a single `fill_symbol` glyph per gene with this precedence (top wins):
 

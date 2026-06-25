@@ -342,23 +342,16 @@ For each surviving canonical, walk the provenance chain `canonical_path_id -> co
 
 **8. Per-gene expansions + decorators**
 
-[`build_canonical_paths_c80s()`](../R/path.R#L265) - split each canonical path into per-gene rows at coarse resolution. Attach max-over-isoforms gene length, gene metadata, cluster_80 metadata, and small-ORF prevalence. **`neighbor_gene_length` here is the max across isoforms of the cluster** - not a single observed gene's length. Use the fine table for exact per-isoform lengths.
-
-[`build_canonical_paths_fine_c80s()`](../R/path.R#L343) - same but at isoform resolution. `neighbor_gene_length` is the exact per-isoform value. Joint-component, gene-meta, and cluster-80 annotations are inherited via the coarse `neighbor_c80_coarse` (no isoform granularity exists for those).
-
-[`decorate_c80s_w_smallORFs()`](../R/parse.R#L95) - decode synthetic small-ORF labels into queryable `is_smallORF`, `centroid_80`, `smallORF_type`, and per-operon `n_smallORFs` / `n_focal` / `dist_to_smallORFs`. Run on both coarse and fine, with `group_key = "uid"` and `"uid_fine"` respectively.
-
-[`decorate_c80s_w_truncation()`](../R/parse.R#L188) - fine only. Adds:
-
-- `is_truncated` (per row) when `neighbor_gene_length < truncation_cutoff * neighbor_c80_length_coarse`
-- `truncate_ratio` (per row), floor-truncated to 3 decimals
-- `n_truncated` (per-isoform broadcast)
-- `is_fragmented` (per row) when this row's `neighbor_c80_coarse` shows up under >= 2 distinct `neighbor_c80_fine` values within this `uid_fine` - same coarse cluster at multiple lengths in one operon
-- `fragmented_c80s`, `n_fragmented_c80s`
-
-**Why fine-only:** the coarse `neighbor_gene_length` is the max-over-isoforms, so "shorter than cutoff" there would mean "even the longest isoform is shorter" - not what truncation should mean.
-
-[`expand_canonical_paths_per_genome()`](../R/path.R#L185) - L3 master table. Re-walks the provenance chain via the shared backbone, this time carrying both `c80_path_fine` and `path_string` payloads. For each per-genome contribution, emit the raw `gene_path` and the canonical-aligned `gene_path_canonical`, plus identity columns inherited from L1 and L2 (`uid`, `uid_fine`, `canonical_path_id`, `fine_canonical_id`, `isoform_rank`, `needs_flip`).
+- [`build_canonical_paths_c80s()`](../R/path.R#L265) - split each canonical path into per-gene rows at **coarse** resolution. Attaches max-over-isoforms gene length, gene metadata, cluster_80 metadata, and small-ORF prevalence. **`neighbor_gene_length` here is the max across isoforms of the cluster** - not a single observed gene's length; use the fine table for exact per-isoform lengths.
+- [`build_canonical_paths_fine_c80s()`](../R/path.R#L343) - same but at **isoform** resolution. `neighbor_gene_length` is the exact per-isoform value. Joint-component, gene-meta, and cluster-80 annotations are inherited via the coarse `neighbor_c80_coarse` (no isoform granularity exists for those).
+- [`decorate_c80s_w_smallORFs()`](../R/parse.R#L95) - decode synthetic small-ORF labels into queryable `is_smallORF`, `centroid_80`, `smallORF_type`, and per-operon `n_smallORFs` / `n_focal` / `dist_to_smallORFs`. Run on both coarse and fine, with `group_key = "uid"` and `"uid_fine"` respectively.
+- [`decorate_c80s_w_truncation()`](../R/parse.R#L188) - **fine only** (the coarse `neighbor_gene_length` is max-over-isoforms, so a truncation test there would only mean "even the longest isoform is short"). Adds:
+    - `is_truncated` (per row) when `neighbor_gene_length < truncation_cutoff * neighbor_c80_length_coarse`
+    - `truncate_ratio` (per row), floor-truncated to 3 decimals
+    - `n_truncated` (per-isoform broadcast)
+    - `is_fragmented` (per row) when this row's `neighbor_c80_coarse` shows up under >= 2 distinct `neighbor_c80_fine` values within this `uid_fine` - same coarse cluster at multiple lengths in one operon
+    - `fragmented_c80s`, `n_fragmented_c80s`
+- [`expand_canonical_paths_per_genome()`](../R/path.R#L185) - the **L3** master table. Re-walks the provenance chain via the shared backbone, this time carrying both `c80_path_fine` and `path_string` payloads. For each per-genome contribution, emits the raw `gene_path` and the canonical-aligned `gene_path_canonical`, plus identity columns inherited from L1 and L2 (`uid`, `uid_fine`, `canonical_path_id`, `fine_canonical_id`, `isoform_rank`, `needs_flip`).
 
 After all expansions, the driver column-orders `c80s_coarse` / `c80s_fine` for readability and writes the five TSVs.
 

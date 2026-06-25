@@ -2,7 +2,7 @@
 """
 build_genome_catalog.py <config.yaml>
 
-Step 0a — build the unified genome catalog the neighbor-extraction chain and
+Step 0a - build the unified genome catalog the neighbor-extraction chain and
 the R pipeline both consume. Reads the `sources:` list from the YAML and
 normalises every source into two source-agnostic artefacts (mirrors model.R
 get_target):
@@ -14,7 +14,7 @@ get_target):
       header:  genome_id <TAB> genes_file_path
       body:    union of (genome_id, path) rows across every source
 
-Catalog lives under proj_dir (not data_dir) so each run carries its own copy —
+Catalog lives under proj_dir (not data_dir) so each run carries its own copy -
 different `sources:` lists across proj_dirs no longer clobber a shared catalog.
 The expensive per-genome `.genes` files (prokka source conversions) stay under
 `<genomes_dir>` and remain shared across runs via the `-s` idempotency guard.
@@ -30,14 +30,14 @@ Each `sources:` entry:
                gene_length in col `length_col`
   c80_col      1-based column of centroid_80 in `genes_info`
   length_col   1-based column of gene_length in `genes_info`. Defaults to 8
-               for midas (UHGG schema). **Required for prokka** — the prokka
+               for midas (UHGG schema). **Required for prokka** - the prokka
                membership schema is user-controlled, so it must be declared.
   genomes_dir  directory of <genome_id>/<genome_id>.genes  (uniform contract)
 
 Both source types read gene_length the same way: straight from the column.
 For prokka, `<genome_id>/<genome_id>.gff` is still converted IN PLACE to
 `<genome_id>.genes` via gff_to_genes.parse_gff_to_tsv when missing (idempotent
-on `-s`) — that file is needed by downstream get_neighbor.sh, but the catalog
+on `-s`) - that file is needed by downstream get_neighbor.sh, but the catalog
 build no longer scans it for gene length.
 
 Global placeholders expanded in every source string field: `{species_id}`,
@@ -62,9 +62,9 @@ written after the dup check passes, so it's never left in a bad state).
 `sources:` is consumed only here - config.R ignores it (it is a list, not a
 scalar section), so the R pipeline is unaffected.
 
-Run order: build_genome_catalog.py -> prepare.R -> run_species.sh -> pipeline.R
+Run order: build_genome_catalog.py -> prepare.R -> build_neighbor_lists.sh -> pipeline.R
 
-Requires the strain-aware-operon conda env (pyyaml + gffutils).
+Requires the pansynteny conda env (pyyaml + gffutils).
 """
 
 import argparse
@@ -79,16 +79,17 @@ from pathlib import Path
 try:
     import yaml
 except ImportError:
-    sys.exit("ERROR: pyyaml not importable - activate the strain-aware-operon "
+    sys.exit("ERROR: pyyaml not importable - activate the pansynteny "
              "conda env (or set its python on PATH).")
 
 # Direct import beats subprocess: one python process, no env-detection dance.
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+# gff_to_genes.py lives alongside the other helpers under scripts/.
+sys.path.insert(0, str(Path(__file__).resolve().parent / "scripts"))
 try:
     from gff_to_genes import parse_gff_to_tsv
 except ImportError as exc:
     sys.exit(f"ERROR: cannot import gff_to_genes ({exc}) - activate the "
-             "strain-aware-operon conda env (it needs gffutils).")
+             "pansynteny conda env (it needs gffutils).")
 
 
 GENES_INFO_NAME    = "catalog_genes_info.tsv"
@@ -102,7 +103,7 @@ DEFAULT_LENGTH_COL = 8           # UHGG `genes_info.tsv` puts gene_length in col
 def genome_id_from_gene_id(gene_id: str) -> str:
     """Strip the trailing _NNNNN field from a gene_id.
 
-    Shared contract with generate_neighbor_list.sh's awk join. Works for both
+    Shared contract with focal_neighbor_list.sh's awk join. Works for both
     `GUT_GENOME000040_00388` -> `GUT_GENOME000040` and
     `GCF_900448275.1_00001` -> `GCF_900448275.1`.
     """
@@ -241,7 +242,7 @@ def process_midas_source(src: dict, genes_info_out, toc_entries: list):
 
 
 def process_prokka_source(src: dict, genes_info_out, toc_entries: list):
-    """Prokka source — gene_length must already be in the membership file
+    """Prokka source - gene_length must already be in the membership file
     (column `length_col`), like midas. The user's upstream BLAST + annotation
     pipeline is responsible for populating it (typically `end - start + 1`
     from the prokka GFF).
@@ -325,7 +326,7 @@ def main():
     # Duplicate-genome_id check: the genome->path map has to be unambiguous.
     dups = check_duplicates(toc_entries)
     if dups:
-        print("ERROR: duplicate genome_id(s) across sources — catalog would be "
+        print("ERROR: duplicate genome_id(s) across sources - catalog would be "
               "ambiguous:", file=sys.stderr)
         for genome_id, src_names in sorted(dups.items()):
             print(f"  {genome_id}: {', '.join(src_names)}", file=sys.stderr)

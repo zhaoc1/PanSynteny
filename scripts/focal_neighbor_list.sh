@@ -1,6 +1,6 @@
 #!/bin/bash
 # ------------------------------------------------------------------------------
-# generate_neighbor_list.sh  <config.yaml> <query>
+# focal_neighbor_list.sh  <config.yaml> <query>
 #
 # For one focal centroid_80 (`query`): pull every gene member from the unified
 # genome-catalog genes_info, resolve each member's per-genome .genes file via
@@ -8,7 +8,7 @@
 # (via get_neighbor.sh). Writes one <out_dir>/<query>.tsv (7 cols, no header):
 #   gene_member  neighbor_gene_id  contig_id  start  end  strand  gene_type
 #
-# Config-driven — reads the same YAML the R pipeline loads:
+# Config-driven - reads the same YAML the R pipeline loads:
 #   job.species_id  +  job.proj_dir   -> step1_setup/ (catalog lookup)
 #   job.species_id  +  data.data_dir  -> list_of_neighbors/ (output)
 #   data.n_genes                      -> flank size for get_neighbor.sh (def 20)
@@ -19,13 +19,13 @@
 # Output:
 #   {data_dir}/{species_id}/list_of_neighbors/<query>.tsv
 #
-# Source-agnostic: it never sees "UHGG vs ECOR" — build_genome_catalog.py has
+# Source-agnostic: it never sees "UHGG vs ECOR" - build_genome_catalog.py has
 # already normalised every source into the two catalog files above. The
 # genome_id is derived from the gene_id (strip trailing _NNNNN); that derivation
 # is the shared contract with build_genome_catalog.py's genome_id_from_gene_id().
 #
 # Copied from
-#   mwas-neighbor-pangraph/pipeline_v1/step1_gene_neighbors/generate_neighbor_list.sh
+#   mwas-neighbor-pangraph/pipeline_v1/step1_gene_neighbors/focal_neighbor_list.sh
 # and adapted: hardcoded midasdb_dir + path-convention .genes lookup replaced by
 # the config-driven genome catalog.
 # ------------------------------------------------------------------------------
@@ -99,7 +99,7 @@ list_of_genes_with_file=$(awk -F'\t' -v c80="$query" '
     }' "$genome_toc_fp" "$genes_info_fp")
 
 if [ -z "$list_of_genes_with_file" ]; then
-    echo "WARN: no gene members for $query — writing empty $outfile" >&2
+    echo "WARN: no gene members for $query - writing empty $outfile" >&2
     : > "$outfile"
     exit 0
 fi

@@ -1,10 +1,12 @@
 # PanSynteny: de novo discovery of recurrent syntenic gene neighborhoods across bacterial pangenomes
 
-> PanSynteny is a pangenome-based framework for de novo discovery of recurrent syntenic gene neighborhoods. Starting from user-defined focal genes, PanSynteny extracts local genomic neighborhoods, canonicalizes orientation, collapses recurring gene-cluster paths across genomes, and reports conserved co-localized neighborhood blocks with genome-level traceability.
+> Find the recurrent, co-localized syntenic gene neighborhoods your genes of interest live in, and how they vary across the strains of a bacterial species.
 
-**Status:** Testing release v0.2.0. Prototype — the YAML schema and output column set may change between 0.x.y versions. Not yet for production.
+**Status:** Testing release v0.3.0. Prototype - the YAML schema and output column set may change between 0.x.y versions. Not yet for production.
 
-Given (1) a pan-genome (centroid_80 clusters from MIDAS) and (2) a user-curated focal-gene table (which centroid_80 clusters to investigate), this pipeline reconstructs **de novo recurring operons** the focal genes live in and harmonizes them across the strains in the species-level pangenome. Outputs are emitted at three granularity levels: coarse canonical operon, length-variant isoform, and per-genome instance - so you can ask either "what operon is this" or "which strains carry which variant." Optionally, it also extracts the contiguous focal-gene blocks (grouped by `focal_label` direction) within each operon. 
+**What it does.** Point PanSynteny at a pangenome (centroid_80 clusters from MIDAS) and a short list of focal genes you care about, and it finds the **recurrent, co-localized syntenic gene neighborhoods** those genes sit in, and shows how each one varies across the strains of the species. You get plain TSV tables and gene-arrow (gggenes) figures at three levels of detail: the consensus neighborhood, its length variants, and the exact genes in each genome. Optionally, it also pulls out the trait-associated gene blocks within each neighborhood.
+
+> **A note on terminology.** Elsewhere in these docs (and in the code), a recurrent, co-localized syntenic gene neighborhood is called an **operon-like structure** or **operon** as shorthand. PanSynteny makes **no claim** of shared transcription, strand co-orientation, or operonic regulation - the structures are defined purely by **recurrent physical co-localization** across genomes.
 
 ---
 
@@ -15,10 +17,7 @@ The full install (R + Python + conda env) is documented in **[SETUP.md](docs/SET
 ```bash
 # One-shot conda env (pulls R + pyyaml + gffutils)
 conda env create -f environment.yml
-conda activate strain-aware-operon
-
-# One R package not in conda
-R -e "install.packages('randomcoloR', repos='https://cloud.r-project.org/')"
+conda activate pansynteny
 
 # Sanity check
 python -c "import yaml, gffutils; print(yaml.__version__, gffutils.__version__)"
@@ -28,54 +27,50 @@ python -c "import yaml, gffutils; print(yaml.__version__, gffutils.__version__)"
 
 ## Quickstart
 
-1. **Edit `example.yaml` for your data:**
-   ```bash
-   # in example.yaml, set: job.species_id, job.proj_dir, job.input_dir, data.midasdb_dir,
-   # data.data_dir, data.focal_meta, data.clusters_80_updated, and the sources: list
-   ```
-   See [USER_GUIDE.md §Configuration](docs/USER_GUIDE.md#configuration-yaml) for every key. (Tip: `cp example.yaml my_config.yaml` first if you want to keep the template clean.)
+> **Prerequisites:** the `pansynteny` conda env (see [SETUP.md](docs/SETUP.md)) and a focal-gene table (TSV).
 
-2. **Run the four ordered commands** - all read the same YAML:
+```bash
+conda activate pansynteny
+```
 
-   ```bash
-   # Step 0a — build the unified genome catalog from sources: in the YAML
-   python build_genome_catalog.py example.yaml
+**1. Make your run config** - copy the template and fill in your paths:
 
-   # Step 0 — snapshot config, cache focal_meta, enumerate missing neighbor TSVs
-   Rscript prepare.R example.yaml
+```bash
+cp example.yaml my_run.yaml
+# edit my_run.yaml: job.{species_id, proj_dir, input_dir},
+# data.{midasdb_dir, data_dir, focal_meta, clusters_80_updated}, and the sources: list
+```
 
-   # Step 0 — materialise any missing per-focal neighbor TSVs
-   bash run_species.sh example.yaml
+Every key is documented in [USER_GUIDE.md section Configuration](docs/USER_GUIDE.md#configuration-yaml).
 
-   # Steps 1–6 — the analytical pipeline
-   Rscript pipeline.R example.yaml
-   ```
+**2. Run the four ordered commands** - all read the same config:
 
-   **Tip — if `conda activate` doesn't take** (IDE terminals, scripts that skip shell init), invoke the env's binaries directly:
-   ```bash
-   ENV=$(conda info --base)/envs/strain-aware-operon
-   PY=$ENV/bin/python
-   RSC=$ENV/bin/Rscript
-   export LD_LIBRARY_PATH=$ENV/lib:$LD_LIBRARY_PATH
+```bash
+python build_genome_catalog.py my_run.yaml   # Step 0a - build the genome catalog from sources:
+Rscript prepare.R my_run.yaml                # Step 0  - cache focal_meta, list missing neighbor TSVs
+bash build_neighbor_lists.sh my_run.yaml     # Step 0  - materialise the neighbor TSVs
+Rscript pipeline.R my_run.yaml               # Steps 1-6 - neighborhoods -> figures -> trait blocks
+```
 
-   $PY build_genome_catalog.py example.yaml
-   $RSC prepare.R example.yaml
-   bash run_species.sh example.yaml
-   $RSC pipeline.R example.yaml
-   ```
+**3. Read your outputs** under `{proj_dir}/`:
 
-3. **Read your outputs** under `{proj_dir}/`:
+| Folder / file | What's in it |
+| --- | --- |
+| `step1_setup/` | Run config snapshot, focal_meta cache, genome catalog |
+| `step2_neighbors/` | Per-genome neighborhood graphs (cache for Step 1) |
+| `step3_path/canonical_paths*.tsv` | Gene neighborhoods at three granularity levels (coarse -> fine -> per-genome) |
+| `step4_parse/` | Neighborhood summaries, fine-isoform selection, BLAST gene-id lists |
+| `step5_figures/*.pdf` | gggenes neighborhood visualizations |
+| `step6_blocks/rep.tsv` | Trait-associated blocks + per-strain attribution (gated by `blocks.skip_block`) |
 
-   | Folder / file | What's in it |
-   | --- | --- |
-   | `step1_setup/` | Run config snapshot, focal_meta cache, genome catalog |
-   | `step2_neighbors/` | Per-genome operon graphs (cache for Step 1) |
-   | `step3_path/canonical_paths*.tsv` | Operons at three granularity levels (coarse → fine → per-genome) |
-   | `step4_parse/` | Operon summaries, fine-isoform selection, BLAST gene-id lists |
-   | `step5_figures/*.pdf` | gggenes operon visualizations |
-   | `step6_blocks/rep.tsv` | Trait-associated blocks + per-strain attribution (gated by `blocks.skip_block`) |
+Column-level schemas live in [SCHEMA.md](docs/SCHEMA.md).
 
-   Column-level schemas live in [SCHEMA.md](docs/SCHEMA.md).
+> **If `conda activate` doesn't stick** (IDE terminals, non-login shells), call the env's interpreters directly - set the lib path and prepend `$ENV/bin/`:
+> ```bash
+> ENV=$(conda info --base)/envs/pansynteny
+> export LD_LIBRARY_PATH=$ENV/lib:$LD_LIBRARY_PATH
+> # then: $ENV/bin/python build_genome_catalog.py ..., $ENV/bin/Rscript prepare.R ...  (bash scripts run as-is)
+> ```
 
 ---
 
@@ -83,14 +78,13 @@ python -c "import yaml, gffutils; print(yaml.__version__, gffutils.__version__)"
 
 | Doc | Read when... |
 | --- | --- |
-| **[USER_GUIDE.md](docs/USER_GUIDE.md)** | You're configuring a run — YAML schema, tunables, output reference. |
+| **[USER_GUIDE.md](docs/USER_GUIDE.md)** | You're configuring a run - YAML schema, tunables, output reference. |
 | **[SETUP.md](docs/SETUP.md)** | You're installing dependencies. |
 | **[STEPS.md](docs/STEPS.md)** | You need to know exactly what one step does (inputs, outputs, logic, caveats). |
 | **[SCHEMA.md](docs/SCHEMA.md)** | You need column-level schemas for any file the pipeline reads or writes. |
 | **[PIPELINE.md](docs/PIPELINE.md)** | You need the c80-column glossary or the truncation/fragmentation flag semantics. |
-| **[diagram.md](docs/diagram.md)** | You want the YAML-key → consumer-step data flow. |
+| **[diagram.md](docs/diagram.md)** | You want the YAML-key -> consumer-step data flow. |
 | **[CLAUDE.md](CLAUDE.md)** | You're a Claude / AI agent working on this repo (keystones, conventions, gotchas). |
-| `parked/` | Project meta: roadmap, critique, validation questions, slide-deck flowchart. Not part of the active doc flow. |
 
 ---
 
@@ -102,8 +96,8 @@ If you use this software, please cite:
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT - see [LICENSE](LICENSE).
 
 ## Contact
 
-Chunyu Zhao — <chunyu.zhao@gladstone.ucsf.edu>
+Chunyu Zhao - <chunyu.zhao@gladstone.ucsf.edu>

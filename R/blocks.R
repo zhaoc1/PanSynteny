@@ -2,7 +2,7 @@
 # blocks.R
 #
 # Step 6 of the strain-aware operon pipeline: focal block analysis (gated by
-# blocks.skip; writes under step6_blocks/).
+# blocks.skip_block; writes under step6_blocks/).
 #
 # Walks from per-gene trait statistics along canonical operon paths to a
 # ranked set of focal block representatives with per-genome

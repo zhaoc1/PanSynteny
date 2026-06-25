@@ -1,14 +1,14 @@
 #!/bin/bash
 # ------------------------------------------------------------------------------
-# run_species.sh  <config.yaml>
+# build_neighbor_lists.sh  <config.yaml>
 #
 # Step 0 entry point: materialise the per-focal neighbor TSVs that pipeline.R consumes. 
-# Fans generate_neighbor_list.sh across every focal centroid listed in gene_list.tsv.
+# Fans focal_neighbor_list.sh across every focal centroid listed in gene_list.tsv.
 #
 # Run order:
 #   python  build_genome_catalog.py <config.yaml>  # builds the genome catalog
 #   Rscript prepare.R               <config.yaml>  # enumerates missing neighbor TSVs
-#   bash    run_species.sh          <config.yaml>  # <-- materialises them
+#   bash    build_neighbor_lists.sh          <config.yaml>  # <-- materialises them
 #   Rscript pipeline.R              <config.yaml>  # consumes them
 #
 # Config-driven: reads the same YAML the R pipeline loads:
@@ -66,13 +66,13 @@ echo "    gene_list=$gene_list ($total focal centroids)"
 echo "    out_dir=$out_dir"
 echo "    parallel_jobs=$parallel_jobs"
 
-# one generate_neighbor_list.sh per focal centroid, parallel_jobs in parallel.
-# Capture generate_neighbor_list.sh's per-focal "skip" messages so we can report
+# one focal_neighbor_list.sh per focal centroid, parallel_jobs in parallel.
+# Capture focal_neighbor_list.sh's per-focal "skip" messages so we can report
 # materialised-vs-skipped truthfully at the end.
 log_tmp=$(mktemp)
 trap 'rm -f "$log_tmp"' EXIT
 cat "$gene_list" | xargs -I{} -P "$parallel_jobs" bash -c \
-    "bash \"$script_dir/generate_neighbor_list.sh\" \"$config\" \"{}\"" \
+    "bash \"$script_dir/scripts/focal_neighbor_list.sh\" \"$config\" \"{}\"" \
     | tee "$log_tmp"
 
 skipped=$(grep -c '^skip ' "$log_tmp" 2>/dev/null || true)

@@ -1,4 +1,4 @@
-name: strain-aware-operon
+name: pansynteny
 channels:
   - conda-forge
   - bioconda
@@ -22,8 +22,9 @@ dependencies:
   - r-rcolorbrewer>=1.1
   - r-scales>=1.2.0
   - r-gridextra>=2.3
+  - r-pheatmap>=1.0.12
   - r-ggraph>=2.1.0
-  - r-gggenes>=4.5.1
+  - r-gggenes>=0.5.1
 
   # Graph analysis
   - r-igraph>=1.5.0
@@ -46,17 +47,10 @@ dependencies:
   # System tools (if needed)
   - pandoc>=2.19
 
-  # Python tools — required by Step 0a (build_genome_catalog.py +
+  # Python tools - required by Step 0a (build_genome_catalog.py +
   # gff_to_genes.py). pyyaml parses <config.yaml>; gffutils backs the Prokka
   # GFF3 -> .genes conversion.
   - python>=3.10
   - pip
   - pyyaml>=6.0
   - gffutils>=0.14
-
-  # R packages not available in conda (install via pip or R)
-  # These will need to be installed separately:
-  # - r-randomcoloR (via CRAN in R)
-
-# After creating the environment, run these R commands to install remaining packages:
-# R -e "install.packages(c('randomcoloR'), repos='https://cloud.r-project.org/')"

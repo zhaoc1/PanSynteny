@@ -2,7 +2,7 @@ job:
   species_id:    "102321"                          # MIDAS species id
   input_dir:     "/path/to/inputs"                 # holds the two user-authored files for this run: this YAML config + the focal_meta TSV.
   proj_dir:      "/path/to/proj_dir"               # output root, used as-is. Include the species_id in the path if you want per-species isolation, e.g. "/path/to/proj_dir/102321".
-  parallel_jobs: 2                                 # -P for run_species.sh's xargs fan-out across focals; cap at ~8 on shared FS
+  parallel_jobs: 2                                 # -P for build_neighbor_lists.sh's xargs fan-out across focals; cap at ~8 on shared FS
 
 data:
   data_dir:            "/path/to/data"                                                       # species-shared caches land under {data_dir}/{species_id}
@@ -11,7 +11,7 @@ data:
   clusters_80_updated: "{midasdb_dir}/pangenomes/{species_id}/clusters_80_info_updated.tsv"  # copied into the local data_dir
   n_genes:             20                                                                    # max neighbors extracted each side of a focal gene along the contig (get_neighbor.sh)
 
-sources:         # consumed by build_genome_catalog.py (config.R ignores it). Single-source (Case 1) shown below; for multi-source + per-source local placeholders, see docs/USER_GUIDE.md §Case 2.
+sources:         # consumed by build_genome_catalog.py (config.R ignores it). Single-source (Case 1) shown below; for multi-source + per-source local placeholders, see docs/USER_GUIDE.md section Case 2.
   - name:        uhgg
     type:        midas
     genes_info:  "{midasdb_dir}/pangenomes/{species_id}/genes_info.tsv"

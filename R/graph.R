@@ -444,6 +444,12 @@ collapse_paths_across_genomes <- function(path_df) {
 # The chosen direction is applied to the original full vector, so synthetic
 # ORFs and adjacent duplicates remain in the stored canonical.
 clean_for_orientation <- function(tokens) {
+  # Only SYNTHETIC small-ORF tokens (the `_`-prefixed labels minted in Step 1)
+  # are dropped from the direction decision. Length-based small ORFs that
+  # clustered into a real centroid_80 (flagged is_smallORF via smallORF_cutoff
+  # in decorate_c80s_w_smallORFs) are NOT stripped here and DO still influence
+  # orientation - by design, since the token is an ordinary c80 id and such
+  # genes are real, reproducible backbone members.
   tokens <- tokens[!startsWith(tokens, "_")]
   if (length(tokens) <= 1) return(tokens)
   tokens[c(TRUE, tokens[-1] != tokens[-length(tokens)])]

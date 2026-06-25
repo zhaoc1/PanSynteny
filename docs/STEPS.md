@@ -316,8 +316,10 @@ Five TSVs under `step3_path/`, at three granularity **levels** (downstream code 
 **1. [`collapse_paths_across_genomes()`](../R/graph.R#L439)**
 Groups `path_df` on `(c80_path_coarse, path_length, path_type)`. One row per coarse operon shape per type. Records `n_genomes`, `neighbor_genomes` (`;`-joined), and `per_genome_path_w_ids` (`;`-joined `path_genome_comp`s - the provenance pointer back to the per-genome paths). Direction is **not** canonicalized here (e.g., `A->B->C` vs `C->B->A` remain two rows).
 
-**2. [`generate_canonical_path()`](../R/graph.R#L560)**
-Applies [`normalize_path()`](../R/graph.R#L492) (lex-min of forward vs reverse, computed on a *cleaned* token vector - synthetic small-ORF tokens stripped, adjacent duplicates collapsed via [`clean_for_orientation()`](../R/graph.R#L462); the chosen direction is then applied to the original full vector) to every row, assigning a surrogate `canonical_path_id`. Aggregates direction-mirror rows by summing `n_genomes` and concatenating provenance. Applies the `path_min_genomes` gate. **This is the survival cut for an operon** - anything below `path_min_genomes` is dropped from L1 onward.
+**2. [`generate_canonical_path()`](../R/graph.R#L560) - canonicalize direction + survival cut.** The subtle one:
+- [`normalize_path()`](../R/graph.R#L492) decides forward vs reverse by lex-min of a *cleaned* token vector - [`clean_for_orientation()`](../R/graph.R#L462) strips synthetic `_`-prefixed small-ORF tokens and collapses adjacent duplicates, so direction keys off the **real-gene backbone**. The chosen direction is then applied to the **full** original token list (small ORFs retained). It only ever returns forward-full or reverse-full - never reorders or drops content.
+- Mirror-image rows now share one normalized string, so they get one surrogate `canonical_path_id`; their `n_genomes` are summed and provenance concatenated.
+- Then the `path_min_genomes` gate is applied. **This is the operon survival cut** - anything below it is dropped from L1 onward.
 
 **3. [`compute_joint_components()`](../R/graph.R#L639)**
 Builds an undirected, type-collapsed gene-level graph from all canonical paths and computes connected components, returning a `(node, joint_component_id)` map. Every centroid_80 in any canonical path is grouped with every c80 it is transitively adjacent to anywhere across the species pangenome. Two things are intentionally kept out of the graph:
@@ -356,6 +358,11 @@ For each surviving canonical, walk the provenance chain `canonical_path_id -> co
 [`expand_canonical_paths_per_genome()`](../R/path.R#L185) - L3 master table. Re-walks the provenance chain via the shared backbone, this time carrying both `c80_path_fine` and `path_string` payloads. For each per-genome contribution, emit the raw `gene_path` and the canonical-aligned `gene_path_canonical`, plus identity columns inherited from L1 and L2 (`uid`, `uid_fine`, `canonical_path_id`, `fine_canonical_id`, `isoform_rank`, `needs_flip`).
 
 After all expansions, the driver column-orders `c80s_coarse` / `c80s_fine` for readability and writes the five TSVs.
+
+### The two invariants worth holding onto
+
+- **One flip decision drives all three levels.** Because `normalize_path` only flips (never reorders or drops), a single boolean (`needs_flip`, computed at the canonical x collapsed-path grain) propagates the chosen direction down to fine resolution and gene-id resolution via a simple `rev()`. If you add a token type that shouldn't affect direction, extend [`clean_for_orientation()`](../R/graph.R#L462) - don't special-case in each caller.
+- **Three frames of "direction" collide here, and #3 wins:** focal-relative (Step 1) -> chromosomal (Step 2) -> lexicographic-then-component-consistent (Step 3). "Left-to-right" in the L1/L2/L3 outputs means *consistent within a joint component*, **not** 5'->3' of any chromosome. To recover real biological direction, walk back via L3's per-genome `gene_path` to chromosomal coordinates.
 
 ### Tunables
 

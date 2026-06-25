@@ -214,9 +214,8 @@ Recursively load every per-focal-per-genome TSV under `neighbor_groups_by_genome
 
 **(c) Label attachment** - always runs after the RDS is loaded.
 
-[`assign_c80_to_short_genes()`](../R/midas.R#L163) calls [`compute_short_gene_prevalence()`](../R/midas.R#L101) to give every NA-`neighbor_c80_coarse` row a synthetic, focal-scoped label of the form `_<focal_c80>-<gene_type>_<rank>`. Per-focal scope is intentional: the same physical short gene next to two different focals receives two different synthetic labels. The function returns both the augmented `gene_neighbors` and a `short_gene_prevalence` lookup (the within-focal proportion, encoded as a negative number to distinguish from genome-wide prevalence).
-
-[`compute_c80_variants()`](../R/midas.R#L215) then builds a global mapping from `(neighbor_c80_coarse, neighbor_gene_length) -> neighbor_c80_fine`. Clusters with one observed length keep their original label; clusters with multiple observed lengths get `<neighbor_c80_coarse>_<rank>` suffixes ordered by length. Globally scoped (no focal_c80 in the key) because cluster identities are defined once at MIDAS database build time. The mapping is left-joined back onto `gene_neighbors`.
+- **`assign_c80_to_short_genes()`** ([midas.R#L163](../R/midas.R#L163)) calls [`compute_short_gene_prevalence()`](../R/midas.R#L101) to give every NA-`neighbor_c80_coarse` row a synthetic, focal-scoped label of the form `_<focal_c80>-<gene_type>_<rank>`. Per-focal scope is intentional: the same physical short gene next to two different focals receives two different synthetic labels. The function returns both the augmented `gene_neighbors` and a `short_gene_prevalence` lookup (the within-focal proportion, encoded as a negative number to distinguish from genome-wide prevalence).
+- **`compute_c80_variants()`** ([midas.R#L215](../R/midas.R#L215)) then builds a global mapping from `(neighbor_c80_coarse, neighbor_gene_length) -> neighbor_c80_fine`. Clusters with one observed length keep their original label; clusters with multiple observed lengths get `<neighbor_c80_coarse>_<rank>` suffixes ordered by length. Globally scoped (no focal_c80 in the key) because cluster identities are defined once at MIDAS database build time. The mapping is left-joined back onto `gene_neighbors`.
 
 ### Tunables
 

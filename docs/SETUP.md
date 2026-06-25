@@ -107,7 +107,7 @@ bash    run_species.sh          <config.yaml>
 Rscript pipeline.R              <config.yaml>
 ```
 
-Working example config: `example.yaml` (template). A real worked-example input bundle (config + focal_meta TSV) lives under `examples/`.
+Working example config: `example.yaml` (template).
 
 ## Troubleshooting
 

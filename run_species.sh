@@ -72,7 +72,7 @@ echo "    parallel_jobs=$parallel_jobs"
 log_tmp=$(mktemp)
 trap 'rm -f "$log_tmp"' EXIT
 cat "$gene_list" | xargs -I{} -P "$parallel_jobs" bash -c \
-    "bash \"$script_dir/generate_neighbor_list.sh\" \"$config\" \"{}\"" \
+    "bash \"$script_dir/scripts/generate_neighbor_list.sh\" \"$config\" \"{}\"" \
     | tee "$log_tmp"
 
 skipped=$(grep -c '^skip ' "$log_tmp" 2>/dev/null || true)

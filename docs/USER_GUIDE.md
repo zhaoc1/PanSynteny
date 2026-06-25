@@ -81,7 +81,7 @@ bash    run_species.sh          <config.yaml>
 Rscript pipeline.R              <config.yaml>
 ```
 
-Working example config: [`example.yaml`](../example.yaml) (template).
+Working example config: [`example.yaml`](../example.yaml) (template). A real worked-example input bundle (config + focal_meta TSV) lives under [`examples/`](../examples/).
 
 ### Tip — pin the env's `python` / `Rscript` in shell variables
 
@@ -382,7 +382,7 @@ sources:
 - `build_genome_catalog.py` walks both sources. The output `catalog_genes_info.tsv` is the **union** of UHGG + ECOR membership rows; `catalog_genome_toc.tsv` is the union of both sources' genomes.
 - For each ECOR genome:
   - The script finds `<genome>/<genome>.gff` under `genomes_dir`.
-  - If `<genome>/<genome>.genes` is missing/empty, [`gff_to_genes.py`](../gff_to_genes.py) is called in-process to derive it (uses `gffutils`). The file lands **next to the `.gff`** — no separate output dir.
+  - If `<genome>/<genome>.genes` is missing/empty, [`gff_to_genes.py`](../scripts/gff_to_genes.py) is called in-process to derive it (uses `gffutils`). The file lands **next to the `.gff`** — no separate output dir.
   - Idempotent on `-s "<g>.genes"`: a non-empty file is left alone on re-run.
   - `gene_length` is **read straight from the membership file** at `length_col`. The .genes conversion no longer scans for length — the file exists only so downstream `get_neighbor.sh` can read it.
 - **Duplicate `genome_id` across sources → the build stops** with an error naming which sources collided. The genome → path map must be unambiguous.
@@ -412,7 +412,7 @@ Downstream, **delete the Step 1 cache** (`step2_neighbors/neighbor_groups.RDS`) 
 
 | Step | What it does | Driver | Helper file(s) | Cache / output |
 |---|---|---|---|---|
-| **0a** | Build the unified genome catalog from `sources:`. Convert prokka `.gff → .genes` in place (idempotent on `-s`). Dup-check genome_id across sources. | [`build_genome_catalog.py`](../build_genome_catalog.py) | [`gff_to_genes.py`](../gff_to_genes.py) | `genome_catalog/{genes_info.tsv, genome_toc.tsv}`; per-prokka-genome `<g>.genes` |
+| **0a** | Build the unified genome catalog from `sources:`. Convert prokka `.gff → .genes` in place (idempotent on `-s`). Dup-check genome_id across sources. | [`build_genome_catalog.py`](../build_genome_catalog.py) | [`gff_to_genes.py`](../scripts/gff_to_genes.py) | `genome_catalog/{genes_info.tsv, genome_toc.tsv}`; per-prokka-genome `<g>.genes` |
 | **0** | Snapshot the YAML. Read focal_meta from YAML, optionally apply `\|score_col\|` thresholds, cache to `focal_meta` target. Enumerate any missing per-focal neighbor TSVs into `gene_list.tsv`. | [`prepare.R`](../prepare.R) | `config.R`, `model.R` | `run_config.yaml`, `gene_meta_full.tsv` (the `focal_meta` cache), `gene_list.tsv` |
 | **0** | Materialise the missing per-focal neighbor TSVs. | [`run_species.sh`](../run_species.sh) | `generate_neighbor_list.sh`, `get_neighbor.sh` | `list_of_neighbors/<focal_c80>.tsv` |
 | **Setup** | Load `cluster_80`, `gene_to_c80` (from the catalog `genes_info`), and the cached focal table. Re-check every focal has a neighbor TSV; abort if not. | [`pipeline.R`](../pipeline.R) lines 11–79 | `config.R`, `model.R` | — |
@@ -494,14 +494,15 @@ A separate gap that remains worth tracking: Step 1's per-focal orientation is lo
 
 ```
 pangenome-operons-v2/
-├── build_genome_catalog.py     # Step 0a: build genome_catalog/{genes_info,genome_toc}.tsv
-├── gff_to_genes.py             # Prokka GFF3 -> .genes TSV (gffutils)
+├── build_genome_catalog.py     # Step 0a: build genome_catalog/{genes_info,genome_toc}.tsv (entry)
 ├── run_species.sh              # Step 0: materialise per-focal neighbor TSVs (entry)
-├── generate_neighbor_list.sh   #   ↳ per-focal driver: joins catalog to .genes via genome_toc
-├── get_neighbor.sh             #     ↳ per-genome: ±n_genes flank from one .genes file
 ├── prepare.R                   # Step 0: snapshot YAML, process focal_meta, list missing TSVs
 ├── pipeline.R                  # Steps 1-6: the driver — reads top-to-bottom
 ├── install_packages.R          # one-off: install the R package deps
+├── scripts/                    # bash + Python helpers (self-locating; called by the entry scripts)
+│   ├── gff_to_genes.py         # Prokka GFF3 -> .genes TSV (gffutils); imported by build_genome_catalog.py
+│   ├── generate_neighbor_list.sh  #   ↳ per-focal driver: joins catalog to .genes via genome_toc
+│   └── get_neighbor.sh         #     ↳ per-genome: ±n_genes flank from one .genes file
 ├── R/                          # sourced helper modules (loaded by prepare.R / pipeline.R)
 │   ├── config.R                # YAML loader + cfg_get
 │   ├── model.R                 # target_layout + get_target (file-path resolver)
@@ -514,6 +515,7 @@ pangenome-operons-v2/
 │   └── plot.R                  # Step 5: global + per-component gggenes plots (and Step 1 diagnostic plots)
 ├── example.yaml                # template config
 ├── environment.yml             # conda env
+├── examples/                   # worked-example input bundle (config + focal_meta TSV)
 ├── README.md                   # landing — quickstart + install
 ├── CLAUDE.md                   # orientation for AI agents
 └── docs/
@@ -569,7 +571,7 @@ These are documented here so you don't trip on them.
 
 ## Where to look next
 
-- **Run end-to-end:** `python build_genome_catalog.py my_run.yaml; Rscript prepare.R my_run.yaml; bash run_species.sh my_run.yaml; Rscript pipeline.R my_run.yaml`. Outputs land in `proj_dir/{step1_setup,step2_neighbors,step3_path,step4_parse,step5_figures,step6_blocks}/` (where `proj_dir` is what you set in the YAML — include `<species_id>` if you want per-species isolation) and `data_dir/<species_id>/{list_of_neighbors,clusters_80_info_updated.tsv}`.
+- **Run end-to-end:** `python build_genome_catalog.py my_run.yaml; Rscript prepare.R my_run.yaml; bash run_species.sh my_run.yaml; Rscript pipeline.R my_run.yaml`. Outputs land in `proj_dir/{step1_setup,step2_neighbors,step3_path,step4_parse,step5_figures,step6_blocks}/` (where `proj_dir` is what you set in the YAML — include `<species_id>` if you want per-species isolation) and `data_dir/<species_id>/{list_of_neighbors,clusters_80_info_updated.tsv}`. (For a real input bundle to point your config at, see [`examples/`](../examples/).)
 - **Read a step in detail:** [STEPS.md](STEPS.md) §STEP N has the full input / output / logic.
 - **Read a function in detail:** every helper has a roxygen-style docstring covering arguments, behavior, and known caveats. Start from the function's call site in `pipeline.R` and follow the link.
 - **Trace a column back through the pipeline:** the order of derivation is roughly Step 1 (neighbor table) → Step 2 (path strings) → Step 3 (canonical/fine/per-genome) → Step 6 (block reps). The c80 column table above explains the three c80 flavors.

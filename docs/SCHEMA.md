@@ -134,8 +134,8 @@ The genome_id derivation from gene_id is shared with `generate_neighbor_list.sh`
 |---|---|
 | **Path** | `<genomes_dir>/<genome_id>/<genome_id>.genes` |
 | **Header** | Yes. |
-| **Writer** | midasdb (for type=midas); [`gff_to_genes.py`](../gff_to_genes.py) in-place from `.gff` (for type=prokka). |
-| **Reader** | [`get_neighbor.sh`](../get_neighbor.sh) for ±n_genes flank extraction. The 7-column per-focal output (see below) inherits all six columns from this file. |
+| **Writer** | midasdb (for type=midas); [`gff_to_genes.py`](../scripts/gff_to_genes.py) in-place from `.gff` (for type=prokka). |
+| **Reader** | [`get_neighbor.sh`](../scripts/get_neighbor.sh) for ±n_genes flank extraction. The 7-column per-focal output (see below) inherits all six columns from this file. |
 
 | Col | Name | Notes |
 |---|---|---|
@@ -152,7 +152,7 @@ The genome_id derivation from gene_id is shared with `generate_neighbor_list.sh`
 |---|---|
 | **Path** | `<genomes_dir>/<genome_id>/<genome_id>.gff` |
 | **Header** | GFF3 spec (`##gff-version 3` + comment lines). |
-| **Reader** | [`gff_to_genes.py`](../gff_to_genes.py) (via `gffutils`). Extracts: `seqid` → contig_id, `start`, `end`, `strand`, `featuretype` → gene_type, `attributes.locus_tag` → gene_id. Skips features without an `ID` attribute (e.g., CRISPR repeats) and contig-level `prokka`-source rows. |
+| **Reader** | [`gff_to_genes.py`](../scripts/gff_to_genes.py) (via `gffutils`). Extracts: `seqid` → contig_id, `start`, `end`, `strand`, `featuretype` → gene_type, `attributes.locus_tag` → gene_id. Skips features without an `ID` attribute (e.g., CRISPR repeats) and contig-level `prokka`-source rows. |
 
 ---
 
@@ -205,7 +205,7 @@ Same columns as the input `data.focal_meta` (see §1), with `is_focal` possibly 
 | **Path** | `{proj_dir}/step1_setup/catalog_genes_info.tsv` |
 | **Header** | Yes. |
 | **Writer** | [`build_genome_catalog.py`](../build_genome_catalog.py), rebuilt every run. |
-| **Reader** | [`generate_neighbor_list.sh`](../generate_neighbor_list.sh) (per-focal gene-member lookup); [`load_c80_tables`](../R/midas.R) (drives `gene_to_c80`). |
+| **Reader** | [`generate_neighbor_list.sh`](../scripts/generate_neighbor_list.sh) (per-focal gene-member lookup); [`load_c80_tables`](../R/midas.R) (drives `gene_to_c80`). |
 
 | Col | Name |
 |---|---|
@@ -222,7 +222,7 @@ Union across every entry in `sources:`. No deduplication (cross-source `genome_i
 | **Path** | `{proj_dir}/step1_setup/catalog_genome_toc.tsv` |
 | **Header** | Yes. |
 | **Writer** | [`build_genome_catalog.py`](../build_genome_catalog.py), rebuilt every run. |
-| **Reader** | [`generate_neighbor_list.sh`](../generate_neighbor_list.sh) (`.genes` path lookup per genome_id). |
+| **Reader** | [`generate_neighbor_list.sh`](../scripts/generate_neighbor_list.sh) (`.genes` path lookup per genome_id). |
 
 | Col | Name |
 |---|---|
@@ -237,7 +237,7 @@ One row per unique `genome_id` across all sources. Duplicate `genome_id` across 
 |---|---|
 | **Path** | `{data_dir}/{species_id}/list_of_neighbors/<focal_c80>.tsv` |
 | **Header** | **No** (deliberately, for awk consumers; `cols_neighbors` in [neighbor.R](../R/neighbor.R) assigns names on read). |
-| **Writer** | [`get_neighbor.sh`](../get_neighbor.sh) via [`generate_neighbor_list.sh`](../generate_neighbor_list.sh) ([`run_species.sh`](../run_species.sh) fans the parallel xargs). |
+| **Writer** | [`get_neighbor.sh`](../scripts/get_neighbor.sh) via [`generate_neighbor_list.sh`](../scripts/generate_neighbor_list.sh) ([`run_species.sh`](../run_species.sh) fans the parallel xargs). |
 | **Reader** | [`load_gene_neighbors`](../R/neighbor.R) (Step 1). |
 | **Idempotency** | `-s "$outfile"` skip — a non-empty existing TSV is left alone. |
 

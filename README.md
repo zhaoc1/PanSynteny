@@ -2,7 +2,7 @@
 
 > PanSynteny is a pangenome-based framework for de novo discovery of recurrent syntenic gene neighborhoods. Starting from user-defined focal genes, PanSynteny extracts local genomic neighborhoods, canonicalizes orientation, collapses recurring gene-cluster paths across genomes, and reports conserved co-localized neighborhood blocks with genome-level traceability.
 
-**Status:** Testing release v0.2.0. Prototype — the YAML schema and output column set may change between 0.x.y versions. Not yet for production.
+**Status:** Testing release v0.3.0. Prototype — the YAML schema and output column set may change between 0.x.y versions. Not yet for production.
 
 Given (1) a pan-genome (centroid_80 clusters from MIDAS) and (2) a user-curated focal-gene table (which centroid_80 clusters to investigate), this pipeline reconstructs **de novo recurring operons** the focal genes live in and harmonizes them across the strains in the species-level pangenome. Outputs are emitted at three granularity levels: coarse canonical operon, length-variant isoform, and per-genome instance - so you can ask either "what operon is this" or "which strains carry which variant." Optionally, it also extracts the contiguous focal-gene blocks (grouped by `focal_label` direction) within each operon. 
 

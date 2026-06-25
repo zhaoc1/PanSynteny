@@ -107,7 +107,7 @@ bash    run_species.sh          <config.yaml>
 Rscript pipeline.R              <config.yaml>
 ```
 
-Working example config: `example.yaml` (template).
+Working example config: `example.yaml` (template). A real worked-example input bundle (config + focal_meta TSV) lives under `examples/`.
 
 ## Troubleshooting
 
@@ -152,11 +152,16 @@ The pipeline driver (`pipeline.R`) sources these R scripts from the `R/` subdire
 
 `prepare.R` is a separate driver that sources only `config.R` + `model.R`.
 
-The Step 0a / Step 0 bash + Python scripts live at the repo root, alongside the driver scripts (`prepare.R`, `pipeline.R`):
+The Step 0a / Step 0 entry-point scripts live at the repo root, alongside the R drivers (`prepare.R`, `pipeline.R`):
 
-- `build_genome_catalog.py`
-- `gff_to_genes.py` (imported by build_genome_catalog.py)
-- `run_species.sh` → `generate_neighbor_list.sh` → `get_neighbor.sh`
+- `build_genome_catalog.py` — imports `scripts/gff_to_genes.py`
+- `run_species.sh` — calls `scripts/generate_neighbor_list.sh` → `scripts/get_neighbor.sh`
+
+Their helpers live under `scripts/` (each resolves siblings via its own path, so the chain works regardless of CWD):
+
+- `scripts/gff_to_genes.py`
+- `scripts/generate_neighbor_list.sh`
+- `scripts/get_neighbor.sh`
 
 ## Data requirements
 

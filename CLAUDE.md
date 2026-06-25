@@ -18,7 +18,7 @@ Six things that aren't obvious from skimming the code:
 
 6. **`focal_min_genomes` ≠ `path_min_genomes`** despite sounding interchangeable. Step 1 cut on per-focal pattern recurrence; Step 3+5 cut on per-canonical-operon recurrence. Different scopes; usually but not necessarily the same value.
 
-**Project status.** v0.2.0 testing release published to `github.com/zhaoc1/PanSynteny` (private). Schema may shift between 0.x.y versions before 1.0.
+**Project status.** v0.3.0 testing release published to `github.com/zhaoc1/PanSynteny` (private). Schema may shift between 0.x.y versions before 1.0.
 
 ## Run commands
 
@@ -41,7 +41,7 @@ bash    run_species.sh          <config.yaml>
 Rscript pipeline.R              <config.yaml>
 ```
 
-Working example config: [example.yaml](example.yaml). `prepare.R` is cheap to re-run (always overwrites the focal_meta cache, the run_config.yaml snapshot, and gene_list.tsv). `pipeline.R` aborts at startup if the focal_meta cache is missing or any `is_focal == TRUE` centroid lacks its neighbor TSV under `neighbor_list/` — both errors point back to `prepare.R`.
+Working example config: [example.yaml](example.yaml). A real worked-example input bundle (config + focal_meta TSV) lives under [examples/](examples/). `prepare.R` is cheap to re-run (always overwrites the focal_meta cache, the run_config.yaml snapshot, and gene_list.tsv). `pipeline.R` aborts at startup if the focal_meta cache is missing or any `is_focal == TRUE` centroid lacks its neighbor TSV under `neighbor_list/` — both errors point back to `prepare.R`.
 
 **Per-focal neighbor TSVs are now materialised in-repo.** `run_species.sh` consumes `gene_list.tsv` (the missing-list `prepare.R` writes) and fans `generate_neighbor_list.sh` over each focal; per-focal idempotency lives in that script. There is no longer an external preprocessing job to coordinate (v0.1.0 required one).
 
@@ -82,15 +82,15 @@ Note the v0.2.0 step renumbering vs v0.1.0: parse was Step 5 → now Step 4; fig
 | File | Role |
 | --- | --- |
 | [build_genome_catalog.py](build_genome_catalog.py) | Reads `sources:` from the YAML; for each source streams membership rows to a merged `catalog_genes_info.tsv` (`gene_id <TAB> centroid_80 <TAB> gene_length`), accumulates a `catalog_genome_toc.tsv` (`genome_id <TAB> .genes path`), converts prokka `.gff → .genes` in place via `gff_to_genes.py`, dup-checks genome_ids across sources. Outputs land under `{proj_dir}/step1_setup/` (per-run). |
-| [gff_to_genes.py](gff_to_genes.py) | Prokka GFF3 → MIDAS `.genes` TSV converter (uses `gffutils`). Imported in-process by `build_genome_catalog.py`. |
+| [gff_to_genes.py](scripts/gff_to_genes.py) | Prokka GFF3 → MIDAS `.genes` TSV converter (uses `gffutils`). Imported in-process by `build_genome_catalog.py`. |
 
 ### Step 0 — neighbor-TSV materialisation (bash chain)
 
 | File | Role |
 | --- | --- |
 | [run_species.sh](run_species.sh) | Top entry point: reads `gene_list.tsv` (the missing-list from `prepare.R`), fans `generate_neighbor_list.sh` over each focal in parallel. |
-| [generate_neighbor_list.sh](generate_neighbor_list.sh) | One focal centroid → its `<query>.tsv`. Joins the catalog `genes_info` (gene members of the focal) to `genome_toc` (`.genes` path per genome), then fans `get_neighbor.sh` per gene member. Idempotent on `-s "$outfile"`. |
-| [get_neighbor.sh](get_neighbor.sh) | Innermost — emits one gene's ±`n_genes` flank from its `.genes` file. Has no hardcoded paths. |
+| [generate_neighbor_list.sh](scripts/generate_neighbor_list.sh) | One focal centroid → its `<query>.tsv`. Joins the catalog `genes_info` (gene members of the focal) to `genome_toc` (`.genes` path per genome), then fans `get_neighbor.sh` per gene member. Idempotent on `-s "$outfile"`. |
+| [get_neighbor.sh](scripts/get_neighbor.sh) | Innermost — emits one gene's ±`n_genes` flank from its `.genes` file. Has no hardcoded paths. |
 
 ### Data flow at a glance
 

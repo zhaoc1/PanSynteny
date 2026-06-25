@@ -23,7 +23,7 @@ Steps 1–6 are one-line orchestrator calls inside [`pipeline.R`](../pipeline.R)
 ## STEP 0a — Build the unified genome catalog
 
 **Driver:** [`build_genome_catalog.py`](../build_genome_catalog.py)
-**Helper:** [`gff_to_genes.py`](../gff_to_genes.py) — Prokka GFF3 → MIDAS `.genes` TSV (uses `gffutils`)
+**Helper:** [`gff_to_genes.py`](../scripts/gff_to_genes.py) — Prokka GFF3 → MIDAS `.genes` TSV (uses `gffutils`)
 
 ### Input
 
@@ -74,7 +74,7 @@ None directly; `sources:` declares everything. `length_col` defaults to 8 (UHGG 
 ## STEP 0 — Focal selection + neighbor-TSV materialisation
 
 **Drivers:** [`prepare.R`](../prepare.R), then [`run_species.sh`](../run_species.sh)
-**Helpers:** `config.R`, `model.R` (for prepare.R); [`generate_neighbor_list.sh`](../generate_neighbor_list.sh) + [`get_neighbor.sh`](../get_neighbor.sh) (for run_species.sh)
+**Helpers:** `config.R`, `model.R` (for prepare.R); [`generate_neighbor_list.sh`](../scripts/generate_neighbor_list.sh) + [`get_neighbor.sh`](../scripts/get_neighbor.sh) (for run_species.sh)
 
 ### Input
 

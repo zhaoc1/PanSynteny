@@ -83,7 +83,8 @@ except ImportError:
              "conda env (or set its python on PATH).")
 
 # Direct import beats subprocess: one python process, no env-detection dance.
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+# gff_to_genes.py lives alongside the other helpers under scripts/.
+sys.path.insert(0, str(Path(__file__).resolve().parent / "scripts"))
 try:
     from gff_to_genes import parse_gff_to_tsv
 except ImportError as exc:

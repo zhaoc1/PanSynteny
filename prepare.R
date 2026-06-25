@@ -15,7 +15,7 @@
 #       at `get_target("focal_meta")`. From there pipeline.R reads it.
 #   (4) Discover which focal centroids still need their per-focal neighbor
 #       TSVs (those are materialised by build_genome_catalog.py +
-#       run_species.sh), and write the missing list to `get_target("gene_list")`.
+#       build_neighbor_lists.sh), and write the missing list to `get_target("gene_list")`.
 #
 # Threshold handling (from the `prepare:` YAML section):
 #   - If `score_col` is empty/missing, focal_meta is passed through as-is.
@@ -137,7 +137,7 @@ write_delim(focal_c80_df, out_fp, delim = "\t")
 cat(sprintf("  cached -> %s\n", out_fp))
 
 # (3) Discover which focal centroids still need their per-focal neighbor TSVs.
-# Those TSVs are produced by build_genome_catalog.py + run_species.sh;
+# Those TSVs are produced by build_genome_catalog.py + build_neighbor_lists.sh;
 # this script only enumerates what's still missing. pipeline.R aborts at
 # startup if any are still absent.
 cat("\n[4/4] Checking neighbor TSVs...\n")
@@ -160,7 +160,7 @@ if (length(genes_missing) > 0) {
     get_target("neighbor_list")
   ))
   cat(sprintf("  list written -> %s\n", gene_list_fp))
-  cat(sprintf("  next: bash run_species.sh %s\n", args[1]))
+  cat(sprintf("  next: bash build_neighbor_lists.sh %s\n", args[1]))
 } else {
   if (file.exists(gene_list_fp)) file.remove(gene_list_fp)
   cat(sprintf("  all %d focal centroids have neighbor TSVs - ready to run pipeline.R\n",

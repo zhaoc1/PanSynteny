@@ -122,7 +122,7 @@ Header row required.
 │   ├── …
 ```
 
-The genome_id derivation from gene_id is shared with `generate_neighbor_list.sh`: strip the trailing `_NNNNN` field. `GUT_GENOME000040_00388` → `GUT_GENOME000040`; `GCF_900448275.1_00001` → `GCF_900448275.1`.
+The genome_id derivation from gene_id is shared with `focal_neighbor_list.sh`: strip the trailing `_NNNNN` field. `GUT_GENOME000040_00388` → `GUT_GENOME000040`; `GCF_900448275.1_00001` → `GCF_900448275.1`.
 
 ---
 
@@ -158,7 +158,7 @@ The genome_id derivation from gene_id is shared with `generate_neighbor_list.sh`
 
 ## 3. Pipeline inputs — Step 0 caches and seeded copies
 
-These are the model.R `# Input` targets: paths the analytical pipeline (and the Step 0 bash chain) **reads** during a run. They're produced upstream by `prepare.R`, `build_genome_catalog.py`, or `run_species.sh` — but from the consumer's perspective they are inputs to the work that follows. Paths reference [model.R](../R/model.R) target keys.
+These are the model.R `# Input` targets: paths the analytical pipeline (and the Step 0 bash chain) **reads** during a run. They're produced upstream by `prepare.R`, `build_genome_catalog.py`, or `build_neighbor_lists.sh` — but from the consumer's perspective they are inputs to the work that follows. Paths reference [model.R](../R/model.R) target keys.
 
 ### `run_config` — config snapshot
 
@@ -187,7 +187,7 @@ Same columns as the input `data.focal_meta` (see §1), with `is_focal` possibly 
 | **Path** | `{proj_dir}/step1_setup/gene_list.tsv` |
 | **Header** | None. One `focal_c80` per line. |
 | **Writer** | [`prepare.R`](../prepare.R), written only when some `is_focal == TRUE` focals lack a per-focal neighbor TSV. Removed when all are present. |
-| **Reader** | [`run_species.sh`](../run_species.sh). |
+| **Reader** | [`build_neighbor_lists.sh`](../build_neighbor_lists.sh). |
 
 ### `clusters_80_updated` (local copy)
 
@@ -205,7 +205,7 @@ Same columns as the input `data.focal_meta` (see §1), with `is_focal` possibly 
 | **Path** | `{proj_dir}/step1_setup/catalog_genes_info.tsv` |
 | **Header** | Yes. |
 | **Writer** | [`build_genome_catalog.py`](../build_genome_catalog.py), rebuilt every run. |
-| **Reader** | [`generate_neighbor_list.sh`](../scripts/generate_neighbor_list.sh) (per-focal gene-member lookup); [`load_c80_tables`](../R/midas.R) (drives `gene_to_c80`). |
+| **Reader** | [`focal_neighbor_list.sh`](../scripts/focal_neighbor_list.sh) (per-focal gene-member lookup); [`load_c80_tables`](../R/midas.R) (drives `gene_to_c80`). |
 
 | Col | Name |
 |---|---|
@@ -222,7 +222,7 @@ Union across every entry in `sources:`. No deduplication (cross-source `genome_i
 | **Path** | `{proj_dir}/step1_setup/catalog_genome_toc.tsv` |
 | **Header** | Yes. |
 | **Writer** | [`build_genome_catalog.py`](../build_genome_catalog.py), rebuilt every run. |
-| **Reader** | [`generate_neighbor_list.sh`](../scripts/generate_neighbor_list.sh) (`.genes` path lookup per genome_id). |
+| **Reader** | [`focal_neighbor_list.sh`](../scripts/focal_neighbor_list.sh) (`.genes` path lookup per genome_id). |
 
 | Col | Name |
 |---|---|
@@ -237,7 +237,7 @@ One row per unique `genome_id` across all sources. Duplicate `genome_id` across 
 |---|---|
 | **Path** | `{data_dir}/{species_id}/list_of_neighbors/<focal_c80>.tsv` |
 | **Header** | **No** (deliberately, for awk consumers; `cols_neighbors` in [neighbor.R](../R/neighbor.R) assigns names on read). |
-| **Writer** | [`get_neighbor.sh`](../scripts/get_neighbor.sh) via [`generate_neighbor_list.sh`](../scripts/generate_neighbor_list.sh) ([`run_species.sh`](../run_species.sh) fans the parallel xargs). |
+| **Writer** | [`get_neighbor.sh`](../scripts/get_neighbor.sh) via [`focal_neighbor_list.sh`](../scripts/focal_neighbor_list.sh) ([`build_neighbor_lists.sh`](../build_neighbor_lists.sh) fans the parallel xargs). |
 | **Reader** | [`load_gene_neighbors`](../R/neighbor.R) (Step 1). |
 | **Idempotency** | `-s "$outfile"` skip — a non-empty existing TSV is left alone. |
 

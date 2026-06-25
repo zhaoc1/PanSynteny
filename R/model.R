@@ -20,7 +20,7 @@ target_layout <- function(species_id, asso="uni") {
   MIDAS_DIR <- cfg_get(job_config, "midas_dir")   # legacy: declared under YAML `mwas:`; used only by the MWAS block below
   
   list(
-    # Input: read by prepare.R / pipeline.R / generate_neighbor_list.sh.
+    # Input: read by prepare.R / pipeline.R / focal_neighbor_list.sh.
     neighbor_list               = glue::glue("{DATA_DIR}/{species_id}/list_of_neighbors"),
     clusters_80_updated         = glue::glue("{DATA_DIR}/{species_id}/clusters_80_info_updated.tsv"),
     

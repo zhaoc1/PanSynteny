@@ -7,7 +7,7 @@ All file paths below resolve through [`get_target()`](../R/model.R#L75) against 
 Stage order:
 
 1. **Step 0a** — build the unified genome catalog (`build_genome_catalog.py`)
-2. **Step 0** — focal selection + missing-neighbor enumeration (`prepare.R`), then materialise the missing neighbors (`run_species.sh`)
+2. **Step 0** — focal selection + missing-neighbor enumeration (`prepare.R`), then materialise the missing neighbors (`build_neighbor_lists.sh`)
 3. Pre-Step driver setup (focal selection, reference tables, run inside `pipeline.R`)
 4. **Step 1** — per-focal neighborhoods → small-ORF + length-variant labels
 5. **Step 2** — per-genome operon graphs → maximal paths
@@ -43,7 +43,7 @@ The YAML `sources:` list. Each entry declares one source:
 ### Output (mirrors `model.R get_target`)
 
 - `{proj_dir}/step1_setup/catalog_genes_info.tsv` — header `gene_id <TAB> centroid_80 <TAB> gene_length`. Union across every source. This is what [`load_c80_tables`](../R/midas.R#L39) reads.
-- `{proj_dir}/step1_setup/catalog_genome_toc.tsv` — header `genome_id <TAB> genes_file_path`. Union across every source. Joined by `generate_neighbor_list.sh` for the `.genes` lookup.
+- `{proj_dir}/step1_setup/catalog_genome_toc.tsv` — header `genome_id <TAB> genes_file_path`. Union across every source. Joined by `focal_neighbor_list.sh` for the `.genes` lookup.
 - Catalog lives under proj_dir (per-run): each iteration carries its own copy, so different `sources:` lists across proj_dirs never clobber a shared catalog. The expensive `.genes` files (prokka conversions) stay under `<genomes_dir>` and remain shared across runs via the `-s` guard.
 - For `type: prokka` sources: `<genomes_dir>/<g>/<g>.genes` written in place via `parse_gff_to_tsv()`. Idempotent on `-s "$genes_fp"` — existing non-empty `.genes` files are not re-converted.
 
@@ -52,7 +52,7 @@ The YAML `sources:` list. Each entry declares one source:
 Per source:
 
 1. **Membership normalise.** Stream `genes_info` row-by-row; emit `gene_id <TAB> centroid_80 <TAB> gene_length`. Both source types read `gene_length` straight from the column at `length_col`. For prokka the user's upstream pipeline (BLAST + annotation) is responsible for populating that column — typically `end - start + 1` from the GFF, easiest to merge in from the prokka `.tsv`'s `length_bp`.
-2. **TOC accumulation.** For each unique genome_id, append `genome_id <TAB> {genomes_dir}/{g}/{g}.genes` to an in-memory list. Genome_id derived from gene_id by stripping the trailing `_NNNNN` field — the same rule `generate_neighbor_list.sh` uses.
+2. **TOC accumulation.** For each unique genome_id, append `genome_id <TAB> {genomes_dir}/{g}/{g}.genes` to an in-memory list. Genome_id derived from gene_id by stripping the trailing `_NNNNN` field — the same rule `focal_neighbor_list.sh` uses.
 
 After all sources:
 
@@ -65,16 +65,16 @@ None directly; `sources:` declares everything. `length_col` defaults to 8 (UHGG 
 
 ### Known caveats
 
-- **The genome_id derivation is a shared contract.** `build_genome_catalog` and `generate_neighbor_list.sh` must agree (`gene_id.rsplit('_', 1)[0]` in Python; same rebuild in awk). Works for `GUT_GENOME000040_00388` and `GCF_900448275.1_00001`. If you add a new source whose id scheme differs, extend the derivation in both places — otherwise the TOC lookup will silently miss those genes.
-- **Requires the strain-aware-operon conda env.** `pyyaml` for YAML, `gffutils` for the prokka conversion. The script hard-errors at startup if either is missing.
+- **The genome_id derivation is a shared contract.** `build_genome_catalog` and `focal_neighbor_list.sh` must agree (`gene_id.rsplit('_', 1)[0]` in Python; same rebuild in awk). Works for `GUT_GENOME000040_00388` and `GCF_900448275.1_00001`. If you add a new source whose id scheme differs, extend the derivation in both places — otherwise the TOC lookup will silently miss those genes.
+- **Requires the pansynteny conda env.** `pyyaml` for YAML, `gffutils` for the prokka conversion. The script hard-errors at startup if either is missing.
 - **The catalog is rebuilt fresh every run** (the two output files are truncated at the start). Only the prokka `.gff → .genes` conversion is `-s`-guarded for idempotency.
 
 ---
 
 ## STEP 0 — Focal selection + neighbor-TSV materialisation
 
-**Drivers:** [`prepare.R`](../prepare.R), then [`run_species.sh`](../run_species.sh)
-**Helpers:** `config.R`, `model.R` (for prepare.R); [`generate_neighbor_list.sh`](../scripts/generate_neighbor_list.sh) + [`get_neighbor.sh`](../scripts/get_neighbor.sh) (for run_species.sh)
+**Drivers:** [`prepare.R`](../prepare.R), then [`build_neighbor_lists.sh`](../build_neighbor_lists.sh)
+**Helpers:** `config.R`, `model.R` (for prepare.R); [`focal_neighbor_list.sh`](../scripts/focal_neighbor_list.sh) + [`get_neighbor.sh`](../scripts/get_neighbor.sh) (for build_neighbor_lists.sh)
 
 ### Input
 
@@ -82,7 +82,7 @@ None directly; `sources:` declares everything. `length_col` defaults to 8 (UHGG 
   - **Minimum required columns** (all four): `focal_c80`, `focal_label`, `is_focal`, `gene_label`. (`gene_label` is your user-defined annotation/category — distinct from the `.genes`-file `gene_type` which is the GFF feature type.)
   - **Optional, consumed when present**: `cor_to_b`, `beta`, `sample_prevalence`, `trait`, `genome_counts`. Step 5's `fill_modes` for the corresponding mode is skipped (with a warning) if its backing column is absent. Step 6 (block extraction) is gated by `blocks.skip_block`.
   - **If `prepare.score_col` is set**, the column it names (e.g. `cor_to_b`) must be present — prepare.R applies the `|score_col|` thresholds and **overwrites `is_focal`** with a warning (use `prepare.score_col: ""` to preserve a hand-curated `is_focal`, e.g. when the meta carries context rows with `is_focal = FALSE` that should not drive Step 1 extraction).
-- `{proj_dir}/step1_setup/catalog_{genes_info,genome_toc}.tsv` from Step 0a (consumed by `run_species.sh` via `generate_neighbor_list.sh`, and by `load_c80_tables` in pipeline.R).
+- `{proj_dir}/step1_setup/catalog_{genes_info,genome_toc}.tsv` from Step 0a (consumed by `build_neighbor_lists.sh` via `focal_neighbor_list.sh`, and by `load_c80_tables` in pipeline.R).
 
 ### Output
 
@@ -101,15 +101,15 @@ None directly; `sources:` declares everything. `length_col` defaults to 8 (UHGG 
    - `write_delim` to `get_target("focal_meta")`. The R pipeline reads from there; the original input is never touched.
 3. **Enumerate missing.** For every `is_focal == TRUE` centroid, check whether `{data_dir}/{species_id}/list_of_neighbors/<focal_c80>.tsv` exists. Missing ids land in `gene_list.tsv`. If all present, the gene_list file is removed.
 
-### Logic — `run_species.sh`
+### Logic — `build_neighbor_lists.sh`
 
 1. Read paths from the YAML: `species_id`, `proj_dir`, `data_dir`. Locate `gene_list.tsv`. If absent, exit 0 ("nothing to materialise").
-2. `cat gene_list.tsv | xargs -P 2 bash -c 'bash generate_neighbor_list.sh <config.yaml> {}'` — one per-focal call per id, two in parallel.
-3. `generate_neighbor_list.sh <config.yaml> <focal_c80>`:
+2. `cat gene_list.tsv | xargs -P 2 bash -c 'bash focal_neighbor_list.sh <config.yaml> {}'` — one per-focal call per id, two in parallel.
+3. `focal_neighbor_list.sh <config.yaml> <focal_c80>`:
    - Read `data.midasdb_dir` / `data_dir` / `n_genes` from the YAML.
    - awk-join the catalog `genes_info.tsv` (rows where `$2 == focal_c80`) to `genome_toc.tsv` (`genome_id → .genes path`), producing `(gene_member, .genes_path)` pairs. Header rows are skipped via `FNR == 1 { next }`.
    - Per pair, call `get_neighbor.sh <gene_id> <genes_file> n_genes` to emit `±n_genes` flank from that gene's contig. Output appended to `<query>.tsv`.
-4. Idempotency: `[[ -s "$outfile" ]] && exit 0` at the top of `generate_neighbor_list.sh` skips already-materialised focals.
+4. Idempotency: `[[ -s "$outfile" ]] && exit 0` at the top of `focal_neighbor_list.sh` skips already-materialised focals.
 
 ### Tunables
 
@@ -136,7 +136,7 @@ Before Step 1 runs, the driver loads three reference tables and filters them dow
 | `gene_to_c80` | [`catalog_genes_info`](../R/model.R) (TSV — the unified catalog from Step 0a) joined to `cluster_80` | Maps each individual `gene_id` to its parent `centroid_80` and the parent's reference length / genome prevalence. **Covers all sources** (UHGG + ECOR + …) — the union from `build_genome_catalog`. |
 | `focal_c80_df` | Built by Step 0 ([`prepare.R`](../prepare.R)) and read from [`focal_meta`](../R/model.R) | One row per candidate gene with an `is_focal` boolean. **Required:** `focal_c80`, `focal_label`, `is_focal`, `gene_label`. **Optional (carried through if present):** `cor_to_b`, `beta`, `sample_prevalence`, `trait`, `genome_counts`. The pipeline does not re-filter. |
 
-The driver errors out at startup in two cases, both with a pointer to `Rscript prepare.R <config.yaml>`: (1) the cached `focal_meta` is not present on disk; (2) one or more `is_focal == TRUE` centroids still missing their per-focal neighbor TSVs under [`neighbor_list`](../R/model.R). The discovery + enumeration of missing TSVs lives in [`prepare.R`](../prepare.R), which writes the list to [`gene_list`](../R/model.R); `run_species.sh` materialises them; this driver only re-checks the contract.
+The driver errors out at startup in two cases, both with a pointer to `Rscript prepare.R <config.yaml>`: (1) the cached `focal_meta` is not present on disk; (2) one or more `is_focal == TRUE` centroids still missing their per-focal neighbor TSVs under [`neighbor_list`](../R/model.R). The discovery + enumeration of missing TSVs lives in [`prepare.R`](../prepare.R), which writes the list to [`gene_list`](../R/model.R); `build_neighbor_lists.sh` materialises them; this driver only re-checks the contract.
 
 ---
 
@@ -148,7 +148,7 @@ The driver errors out at startup in two cases, both with a pointer to `Rscript p
 ### Input
 
 - `focal_c80_df` — derived from the cached [`focal_meta`](../R/model.R) (written by `prepare.R`). One row per focal `centroid_80`, with `c80_label` ∈ {`pos`, `neg`} from the sign of `cor_to_b`. Renames `gene_id → c80`.
-- Per-focal neighbor TSVs on disk under [`neighbor_list`](../R/model.R) (one `<focal_c80>.tsv` per focal). Each TSV has 7 columns: `gene_member`, `neighbor_gene_id`, `neighbor_contig_id`, `neighbor_gene_start`, `neighbor_gene_end`, `neighbor_gene_strand`, `neighbor_gene_type`. These are produced by `run_species.sh` (which fans `generate_neighbor_list.sh` and `get_neighbor.sh` over `gene_list.tsv`); the driver only reads them.
+- Per-focal neighbor TSVs on disk under [`neighbor_list`](../R/model.R) (one `<focal_c80>.tsv` per focal). Each TSV has 7 columns: `gene_member`, `neighbor_gene_id`, `neighbor_contig_id`, `neighbor_gene_start`, `neighbor_gene_end`, `neighbor_gene_strand`, `neighbor_gene_type`. These are produced by `build_neighbor_lists.sh` (which fans `focal_neighbor_list.sh` and `get_neighbor.sh` over `gene_list.tsv`); the driver only reads them.
 - `gene_to_c80` — to map `neighbor_gene_id → neighbor_c80_coarse` (and pull cluster-level gene length / prevalence).
 
 ### Output

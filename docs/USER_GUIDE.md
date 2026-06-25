@@ -20,7 +20,7 @@ The driver is [`pipeline.R`](../pipeline.R). Steps 1–4 produce the analytical 
 
 ## How to run
 
-The full workflow is **four ordered commands**, all reading the same `<config.yaml>`. Everything runs under the `strain-aware-operon` conda env (see [SETUP.md](SETUP.md)).
+The full workflow is **four ordered commands**, all reading the same `<config.yaml>`. Everything runs under the `pansynteny` conda env (see [SETUP.md](SETUP.md)).
 
 ### Pre-flight checklist
 
@@ -28,7 +28,7 @@ Sanity-check the run inputs before launching:
 
 | Check | Why |
 |---|---|
-| `conda activate strain-aware-operon` | every script (R + Python) uses this env's interpreters |
+| `conda activate pansynteny` | every script (R + Python) uses this env's interpreters |
 | `data.focal_meta` resolves to an existing file | prepare.R aborts at startup otherwise |
 | focal_meta header contains `focal_c80, focal_label, is_focal, gene_label` | minimum required schema (see "data" / "focal_meta column requirements") |
 | `data.clusters_80_updated` resolves to an existing file (or local copy already exists) | prepare.R seeds the local copy from this on first run; required if the local copy isn't there yet |
@@ -59,7 +59,7 @@ Most reruns are cheap because the expensive artifacts are `-s`-guarded. Knowing 
 | `{proj_dir}/step1_setup/gene_meta_full.tsv` | `prepare.R` (the `focal_meta` target) | Always rewritten — re-derived from `data.focal_meta` + `prepare.*` thresholds. |
 | `{data_dir}/{species_id}/clusters_80_info_updated.tsv` | `prepare.R` (the `clusters_80_updated` target) | **Seeded once** from `data.clusters_80_updated` (`overwrite = FALSE`). Subsequent runs preserve any hand edits to the local copy. To refresh from the source: `rm` the local file then re-run prepare.R. |
 | `{proj_dir}/step1_setup/gene_list.tsv` | `prepare.R` | Written only if some focals still lack neighbor TSVs; removed once all are present. |
-| `{data_dir}/{species_id}/list_of_neighbors/<focal_c80>.tsv` | `run_species.sh` | Only materialised if missing/empty. Force re-extraction by deleting individual files (or the whole directory). |
+| `{data_dir}/{species_id}/list_of_neighbors/<focal_c80>.tsv` | `build_neighbor_lists.sh` | Only materialised if missing/empty. Force re-extraction by deleting individual files (or the whole directory). |
 | `step2_neighbors/neighbor_groups.RDS` | pipeline.R Step 1 | **Cache gate for Step 1** — delete to force Step 1 to re-run. |
 | `step3_path/path_df.rds` | pipeline.R Step 2 | **Cache gate for Step 2** — delete to force Step 2 to re-run. |
 | `step3_path/canonical_paths*.tsv`, `step4_parse/*`, `step5_figures/*`, `step6_blocks/*` | pipeline.R Steps 3-6 | Always re-run; nothing to delete. |
@@ -75,7 +75,7 @@ python  build_genome_catalog.py <config.yaml>
 Rscript prepare.R               <config.yaml>
 
 # Step 0  — materialise the missing per-focal neighbor TSVs
-bash    run_species.sh          <config.yaml>
+bash    build_neighbor_lists.sh          <config.yaml>
 
 # Steps 1-6 — analytical pipeline
 Rscript pipeline.R              <config.yaml>
@@ -85,24 +85,24 @@ Working example config: [`example.yaml`](../example.yaml) (template).
 
 ### Tip — pin the env's `python` / `Rscript` in shell variables
 
-If `conda activate strain-aware-operon` doesn't behave (`which python` still pointing at the base / system install, or running from an IDE terminal that doesn't load your shell init), you can skip activation entirely by calling the env's interpreters directly:
+If `conda activate pansynteny` doesn't behave (`which python` still pointing at the base / system install, or running from an IDE terminal that doesn't load your shell init), you can skip activation entirely by calling the env's interpreters directly:
 
 ```bash
-PY=/pollard/home/czhao/miniconda3/envs/strain-aware-operon/bin/python
-RSC=/pollard/home/czhao/miniconda3/envs/strain-aware-operon/bin/Rscript
+PY=/pollard/home/czhao/miniconda3/envs/pansynteny/bin/python
+RSC=/pollard/home/czhao/miniconda3/envs/pansynteny/bin/Rscript
 
 $PY  build_genome_catalog.py <config.yaml>
 $RSC prepare.R               <config.yaml>
-bash run_species.sh          <config.yaml>
+bash build_neighbor_lists.sh          <config.yaml>
 $RSC pipeline.R              <config.yaml>
 ```
 
-This sidesteps `conda activate` and removes any ambiguity about which interpreter is in use. The bash scripts (`run_species.sh`, `generate_neighbor_list.sh`, `get_neighbor.sh`) call `python3` internally for their YAML helper — if `python3` doesn't resolve to the env, prepend `PATH=$(dirname $PY):$PATH` to those bash invocations, or activate the env normally.
+This sidesteps `conda activate` and removes any ambiguity about which interpreter is in use. The bash scripts (`build_neighbor_lists.sh`, `focal_neighbor_list.sh`, `get_neighbor.sh`) call `python3` internally for their YAML helper — if `python3` doesn't resolve to the env, prepend `PATH=$(dirname $PY):$PATH` to those bash invocations, or activate the env normally.
 
 For the R scripts: invoking the env's `Rscript` directly is enough when `LD_LIBRARY_PATH` already contains the env's lib dir (avoids the `GLIBCXX_3.4.30 not found` failure from `vroom`/`readr`). If you hit that error, prepend:
 
 ```bash
-export LD_LIBRARY_PATH=/pollard/home/czhao/miniconda3/envs/strain-aware-operon/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/pollard/home/czhao/miniconda3/envs/pansynteny/lib:$LD_LIBRARY_PATH
 ```
 
 (Activation does this for you automatically — direct invocation may not.)
@@ -125,7 +125,7 @@ For `type: prokka` sources it converts each `<g>.gff → <g>.genes` **in place**
 
 Always overwrites — cheap to re-run.
 
-**Step 0 — `run_species.sh`.** Consumes `gene_list.tsv` (the missing-list from `prepare.R`); fans `generate_neighbor_list.sh` over each focal in parallel. `generate_neighbor_list.sh` joins the catalog `genes_info` (gene members of the focal) to `genome_toc` (each genome's `.genes` path) and calls `get_neighbor.sh` per gene member. Output: `{data_dir}/{species_id}/list_of_neighbors/<focal_c80>.tsv` (7 cols, no header). Per-focal idempotency via `-s "$outfile"`. No-op if `gene_list.tsv` is absent.
+**Step 0 — `build_neighbor_lists.sh`.** Consumes `gene_list.tsv` (the missing-list from `prepare.R`); fans `focal_neighbor_list.sh` over each focal in parallel. `focal_neighbor_list.sh` joins the catalog `genes_info` (gene members of the focal) to `genome_toc` (each genome's `.genes` path) and calls `get_neighbor.sh` per gene member. Output: `{data_dir}/{species_id}/list_of_neighbors/<focal_c80>.tsv` (7 cols, no header). Per-focal idempotency via `-s "$outfile"`. No-op if `gene_list.tsv` is absent.
 
 **Steps 1–4 — `pipeline.R`.** Reads the cached focal table that `prepare.R` produced. The driver consumes `focal_c80_df` as-is and does **not** apply any threshold of its own — that decision is owned by `prepare.R`. If the focal_meta cache is missing or any `is_focal` centroid still lacks a neighbor TSV, the driver aborts at startup with a pointer back to `prepare.R`.
 
@@ -144,12 +144,12 @@ job:
   species_id:    "102321"             # MIDAS species id (numeric)
   proj_dir:      "/path/to/results"   # output root, used as-is (include species_id in the path for per-species isolation, e.g. "/path/to/results/102321")
   input_dir:     "/path/to/inputs"    # required: holds the YAML config + the focal_meta TSV for this run; usable as {input_dir} anywhere in the YAML
-  parallel_jobs: 2                    # required: -P for run_species.sh's xargs fan-out across focals (typical: 2)
+  parallel_jobs: 2                    # required: -P for build_neighbor_lists.sh's xargs fan-out across focals (typical: 2)
 ```
 
 `trait` was removed in this version (unused). All four `job:` keys are **required** — `load_job_config` aborts with a clear error if `input_dir` or `parallel_jobs` is missing. The recommended convention is to keep the YAML and the `focal_meta` TSV side-by-side under `input_dir/` — see [Recommended `input_dir/` layout](#recommended-input_dir-layout) above.
 
-`parallel_jobs` controls how many focals `run_species.sh` extracts in parallel (xargs `-P`). Cap at ~8 on shared filesystems — `get_neighbor.sh` is I/O-bound on `.genes` reads, so over-parallelising hammers storage for everyone.
+`parallel_jobs` controls how many focals `build_neighbor_lists.sh` extracts in parallel (xargs `-P`). Cap at ~8 on shared filesystems — `get_neighbor.sh` is I/O-bound on `.genes` reads, so over-parallelising hammers storage for everyone.
 
 ### `data` — required
 
@@ -354,7 +354,7 @@ sources:
 ```bash
 python  build_genome_catalog.py <config.yaml>
 Rscript prepare.R               <config.yaml>
-bash    run_species.sh          <config.yaml>
+bash    build_neighbor_lists.sh          <config.yaml>
 Rscript pipeline.R              <config.yaml>
 ```
 
@@ -396,7 +396,7 @@ sources:
 
 **Notes specific to Prokka sources:**
 
-- The gene_id derivation (`genome_id_from_gene_id` — strip trailing `_NNNNN`) must produce `genome_id` values that match the **directory name** under `genomes_dir`. For ECOR's `GCF_900448275.1_00001` → `GCF_900448275.1`, this matches `<ecor_genomes_dir>/GCF_900448275.1/` ✓. If you bring in a new source whose id scheme doesn't follow this, extend the derivation in both `build_genome_catalog.py` (`genome_id_from_gene_id`) and `generate_neighbor_list.sh` (the awk join).
+- The gene_id derivation (`genome_id_from_gene_id` — strip trailing `_NNNNN`) must produce `genome_id` values that match the **directory name** under `genomes_dir`. For ECOR's `GCF_900448275.1_00001` → `GCF_900448275.1`, this matches `<ecor_genomes_dir>/GCF_900448275.1/` ✓. If you bring in a new source whose id scheme doesn't follow this, extend the derivation in both `build_genome_catalog.py` (`genome_id_from_gene_id`) and `focal_neighbor_list.sh` (the awk join).
 - ECOR genes can map to centroid_80s from **any** species (not just the run's `species_id`). After `load_c80_tables` joins those to `clusters_80_updated` (which is species-scoped), off-species rows carry the correct `centroid_80` and `gene_length` but their `neighbor_c80_length_coarse` / `genome_prevalence` come through as `NA`. Downstream truncation / fragmentation flags handle this NA-tolerantly.
 - The first prokka run does the conversion (~5-15 s per genome via `gffutils`). Subsequent runs skip already-converted `.genes` files; budget time accordingly on first runs.
 
@@ -414,7 +414,7 @@ Downstream, **delete the Step 1 cache** (`step2_neighbors/neighbor_groups.RDS`) 
 |---|---|---|---|---|
 | **0a** | Build the unified genome catalog from `sources:`. Convert prokka `.gff → .genes` in place (idempotent on `-s`). Dup-check genome_id across sources. | [`build_genome_catalog.py`](../build_genome_catalog.py) | [`gff_to_genes.py`](../scripts/gff_to_genes.py) | `genome_catalog/{genes_info.tsv, genome_toc.tsv}`; per-prokka-genome `<g>.genes` |
 | **0** | Snapshot the YAML. Read focal_meta from YAML, optionally apply `\|score_col\|` thresholds, cache to `focal_meta` target. Enumerate any missing per-focal neighbor TSVs into `gene_list.tsv`. | [`prepare.R`](../prepare.R) | `config.R`, `model.R` | `run_config.yaml`, `gene_meta_full.tsv` (the `focal_meta` cache), `gene_list.tsv` |
-| **0** | Materialise the missing per-focal neighbor TSVs. | [`run_species.sh`](../run_species.sh) | `generate_neighbor_list.sh`, `get_neighbor.sh` | `list_of_neighbors/<focal_c80>.tsv` |
+| **0** | Materialise the missing per-focal neighbor TSVs. | [`build_neighbor_lists.sh`](../build_neighbor_lists.sh) | `focal_neighbor_list.sh`, `get_neighbor.sh` | `list_of_neighbors/<focal_c80>.tsv` |
 | **Setup** | Load `cluster_80`, `gene_to_c80` (from the catalog `genes_info`), and the cached focal table. Re-check every focal has a neighbor TSV; abort if not. | [`pipeline.R`](../pipeline.R) lines 11–79 | `config.R`, `model.R` | — |
 | **1** | Per-focal neighborhood extraction → cross-genome assembly → small-ORF + length-variant labels. Orchestrated by [`run_step1_neighbor_extraction`](../R/neighbor.R). | `pipeline.R` lines 82–92 | `neighbor.R`, `midas.R` | `step2_neighbors/neighbor_groups.RDS` (cache) |
 | **2** | Per-genome operon graphs → maximal paths. Orchestrated by [`run_step2_path_stitching`](../R/graph.R). | `pipeline.R` lines 95–100 | `graph.R` | `step3_path/path_df.rds`, `step3_path/esupport_df.rds` |
@@ -495,13 +495,13 @@ A separate gap that remains worth tracking: Step 1's per-focal orientation is lo
 ```
 pangenome-operons-v2/
 ├── build_genome_catalog.py     # Step 0a: build genome_catalog/{genes_info,genome_toc}.tsv (entry)
-├── run_species.sh              # Step 0: materialise per-focal neighbor TSVs (entry)
+├── build_neighbor_lists.sh              # Step 0: materialise per-focal neighbor TSVs (entry)
 ├── prepare.R                   # Step 0: snapshot YAML, process focal_meta, list missing TSVs
 ├── pipeline.R                  # Steps 1-6: the driver — reads top-to-bottom
 ├── install_packages.R          # one-off: install the R package deps
 ├── scripts/                    # bash + Python helpers (self-locating; called by the entry scripts)
 │   ├── gff_to_genes.py         # Prokka GFF3 -> .genes TSV (gffutils); imported by build_genome_catalog.py
-│   ├── generate_neighbor_list.sh  #   ↳ per-focal driver: joins catalog to .genes via genome_toc
+│   ├── focal_neighbor_list.sh  #   ↳ per-focal driver: joins catalog to .genes via genome_toc
 │   └── get_neighbor.sh         #     ↳ per-genome: ±n_genes flank from one .genes file
 ├── R/                          # sourced helper modules (loaded by prepare.R / pipeline.R)
 │   ├── config.R                # YAML loader + cfg_get
@@ -570,7 +570,7 @@ These are documented here so you don't trip on them.
 
 ## Where to look next
 
-- **Run end-to-end:** `python build_genome_catalog.py my_run.yaml; Rscript prepare.R my_run.yaml; bash run_species.sh my_run.yaml; Rscript pipeline.R my_run.yaml`. Outputs land in `proj_dir/{step1_setup,step2_neighbors,step3_path,step4_parse,step5_figures,step6_blocks}/` (where `proj_dir` is what you set in the YAML — include `<species_id>` if you want per-species isolation) and `data_dir/<species_id>/{list_of_neighbors,clusters_80_info_updated.tsv}`.
+- **Run end-to-end:** `python build_genome_catalog.py my_run.yaml; Rscript prepare.R my_run.yaml; bash build_neighbor_lists.sh my_run.yaml; Rscript pipeline.R my_run.yaml`. Outputs land in `proj_dir/{step1_setup,step2_neighbors,step3_path,step4_parse,step5_figures,step6_blocks}/` (where `proj_dir` is what you set in the YAML — include `<species_id>` if you want per-species isolation) and `data_dir/<species_id>/{list_of_neighbors,clusters_80_info_updated.tsv}`.
 - **Read a step in detail:** [STEPS.md](STEPS.md) §STEP N has the full input / output / logic.
 - **Read a function in detail:** every helper has a roxygen-style docstring covering arguments, behavior, and known caveats. Start from the function's call site in `pipeline.R` and follow the link.
 - **Trace a column back through the pipeline:** the order of derivation is roughly Step 1 (neighbor table) → Step 2 (path strings) → Step 3 (canonical/fine/per-genome) → Step 6 (block reps). The c80 column table above explains the three c80 flavors.

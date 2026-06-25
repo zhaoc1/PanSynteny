@@ -15,10 +15,7 @@ The full install (R + Python + conda env) is documented in **[SETUP.md](docs/SET
 ```bash
 # One-shot conda env (pulls R + pyyaml + gffutils)
 conda env create -f environment.yml
-conda activate strain-aware-operon
-
-# One R package not in conda
-R -e "install.packages('randomcoloR', repos='https://cloud.r-project.org/')"
+conda activate pansynteny
 
 # Sanity check
 python -c "import yaml, gffutils; print(yaml.__version__, gffutils.__version__)"
@@ -45,7 +42,7 @@ python -c "import yaml, gffutils; print(yaml.__version__, gffutils.__version__)"
    Rscript prepare.R example.yaml
 
    # Step 0 — materialise any missing per-focal neighbor TSVs
-   bash run_species.sh example.yaml
+   bash build_neighbor_lists.sh example.yaml
 
    # Steps 1–6 — the analytical pipeline
    Rscript pipeline.R example.yaml
@@ -53,14 +50,14 @@ python -c "import yaml, gffutils; print(yaml.__version__, gffutils.__version__)"
 
    **Tip — if `conda activate` doesn't take** (IDE terminals, scripts that skip shell init), invoke the env's binaries directly:
    ```bash
-   ENV=$(conda info --base)/envs/strain-aware-operon
+   ENV=$(conda info --base)/envs/pansynteny
    PY=$ENV/bin/python
    RSC=$ENV/bin/Rscript
    export LD_LIBRARY_PATH=$ENV/lib:$LD_LIBRARY_PATH
 
    $PY build_genome_catalog.py example.yaml
    $RSC prepare.R example.yaml
-   bash run_species.sh example.yaml
+   bash build_neighbor_lists.sh example.yaml
    $RSC pipeline.R example.yaml
    ```
 

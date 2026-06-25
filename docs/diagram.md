@@ -32,7 +32,7 @@ prepare.focal_cutoff ───│───►│  process focal_meta;    │
                         │                 │ focal_meta cache + gene_list.tsv
                         │                 ▼
                         └───►┌─────────────────────────┐
-                             │ run_species.sh (Step 0) │
+                             │ build_neighbor_lists.sh (Step 0) │
                              │  → generate_neighbor_   │
                              │      list.sh            │
                              │  → get_neighbor.sh      │
@@ -103,7 +103,7 @@ When you change a YAML key, you must also delete the listed cache file(s) to mak
 | `sources` (list), `data.midasdb_dir`, `job.proj_dir`, `length_col` | `{proj_dir}/step1_setup/{catalog_genes_info.tsv, catalog_genome_toc.tsv}` — re-run `build_genome_catalog.py` |
 | (prokka source's `.gff` updated) | also `rm <genomes_dir>/<g>/<g>.genes` for the affected genome(s); the `-s` guard skips re-conversion otherwise |
 | `data.focal_meta`, `prepare.*` | `step1_setup/gene_meta_full.tsv` *(the `focal_meta` cache; re-run prepare.R)* + `step2_neighbors/neighbor_groups.RDS` *(Step 1)* |
-| `data.n_genes` | every `{data_dir}/{species_id}/list_of_neighbors/<focal_c80>.tsv` *(re-run run_species.sh)* + `step2_neighbors/neighbor_groups.RDS` |
+| `data.n_genes` | every `{data_dir}/{species_id}/list_of_neighbors/<focal_c80>.tsv` *(re-run build_neighbor_lists.sh)* + `step2_neighbors/neighbor_groups.RDS` |
 | `neighbor.*`, `plot.gene_padding_bp` (Step 1 use) | `step2_neighbors/neighbor_groups.RDS` |
 | `path.path_min_genomes`, `path.truncation_cutoff` | `step3_path/path_df.rds` |
 | `blocks.*` | nothing (Step 6 always re-runs when not skipped) |

@@ -1,8 +1,8 @@
 #!/usr/bin/env Rscript
-# R package installation script for strain-aware-operon analysis
+# R package installation script for pansynteny analysis
 # Run this after creating the conda environment
 
-cat("Installing R packages for strain-aware-operon analysis...\n\n")
+cat("Installing R packages for pansynteny analysis...\n\n")
 
 # Set CRAN mirror
 options(repos = c(CRAN = "https://cloud.r-project.org/"))

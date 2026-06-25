@@ -9,11 +9,11 @@
 #   - `grep -C n_genes` keeps the member +/- n_genes neighbours
 #   - prepends the gene member id as a new first column
 #
-# n_genes defaults to 20 if not supplied; generate_neighbor_list.sh passes the
+# n_genes defaults to 20 if not supplied; focal_neighbor_list.sh passes the
 # value resolved from neighbor.n_genes in the YAML config.
 #
 # Innermost script of the neighbor-extraction chain
-#   run_species.sh -> generate_neighbor_list.sh -> get_neighbor.sh
+#   build_neighbor_lists.sh -> focal_neighbor_list.sh -> get_neighbor.sh
 # Copied verbatim from
 #   mwas-neighbor-pangraph/pipeline_v1/step1_gene_neighbors/get_neighbor.sh
 # (no hardcoded paths - nothing to integrate).

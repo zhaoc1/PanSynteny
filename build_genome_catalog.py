@@ -62,9 +62,9 @@ written after the dup check passes, so it's never left in a bad state).
 `sources:` is consumed only here - config.R ignores it (it is a list, not a
 scalar section), so the R pipeline is unaffected.
 
-Run order: build_genome_catalog.py -> prepare.R -> run_species.sh -> pipeline.R
+Run order: build_genome_catalog.py -> prepare.R -> build_neighbor_lists.sh -> pipeline.R
 
-Requires the strain-aware-operon conda env (pyyaml + gffutils).
+Requires the pansynteny conda env (pyyaml + gffutils).
 """
 
 import argparse
@@ -79,7 +79,7 @@ from pathlib import Path
 try:
     import yaml
 except ImportError:
-    sys.exit("ERROR: pyyaml not importable - activate the strain-aware-operon "
+    sys.exit("ERROR: pyyaml not importable - activate the pansynteny "
              "conda env (or set its python on PATH).")
 
 # Direct import beats subprocess: one python process, no env-detection dance.
@@ -89,7 +89,7 @@ try:
     from gff_to_genes import parse_gff_to_tsv
 except ImportError as exc:
     sys.exit(f"ERROR: cannot import gff_to_genes ({exc}) - activate the "
-             "strain-aware-operon conda env (it needs gffutils).")
+             "pansynteny conda env (it needs gffutils).")
 
 
 GENES_INFO_NAME    = "catalog_genes_info.tsv"
@@ -103,7 +103,7 @@ DEFAULT_LENGTH_COL = 8           # UHGG `genes_info.tsv` puts gene_length in col
 def genome_id_from_gene_id(gene_id: str) -> str:
     """Strip the trailing _NNNNN field from a gene_id.
 
-    Shared contract with generate_neighbor_list.sh's awk join. Works for both
+    Shared contract with focal_neighbor_list.sh's awk join. Works for both
     `GUT_GENOME000040_00388` -> `GUT_GENOME000040` and
     `GCF_900448275.1_00001` -> `GCF_900448275.1`.
     """

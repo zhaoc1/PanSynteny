@@ -1,6 +1,6 @@
 #!/bin/bash
 # ------------------------------------------------------------------------------
-# generate_neighbor_list.sh  <config.yaml> <query>
+# focal_neighbor_list.sh  <config.yaml> <query>
 #
 # For one focal centroid_80 (`query`): pull every gene member from the unified
 # genome-catalog genes_info, resolve each member's per-genome .genes file via
@@ -25,7 +25,7 @@
 # is the shared contract with build_genome_catalog.py's genome_id_from_gene_id().
 #
 # Copied from
-#   mwas-neighbor-pangraph/pipeline_v1/step1_gene_neighbors/generate_neighbor_list.sh
+#   mwas-neighbor-pangraph/pipeline_v1/step1_gene_neighbors/focal_neighbor_list.sh
 # and adapted: hardcoded midasdb_dir + path-convention .genes lookup replaced by
 # the config-driven genome catalog.
 # ------------------------------------------------------------------------------

@@ -21,17 +21,11 @@ This document covers the environment needed to run the pipeline end-to-end. See 
 
 2. **Activate it:**
    ```bash
-   conda activate strain-aware-operon
+   conda activate pansynteny
    ```
    Everything below — `Rscript`, `python`, the bash chain — uses this env's interpreters.
 
-3. **R packages not on conda-forge / bioconda:**
-   ```bash
-   R -e "install.packages(c('randomcoloR'), repos='https://cloud.r-project.org/')"
-   ```
-   (`gggenes` ≥ 4.5.1 *is* on conda-forge, so no separate pip/CRAN step.)
-
-4. **Optional: verify everything imports**
+3. **Optional: verify everything imports**
    ```bash
    Rscript install_packages.R
    python -c "import yaml, gffutils; print(yaml.__version__, gffutils.__version__)"
@@ -54,9 +48,9 @@ The pipeline writes figures directly via `ggsave` — no LaTeX needed. LaTeX is 
 
 ## Dependencies summary
 
-### R packages (25 total)
+### R packages (24 total)
 - **tidyverse:** dplyr, tidyr, purrr, stringr, ggplot2, readr, tibble
-- **Visualization:** gggenes, ggraph, gridExtra, viridis, RColorBrewer, scales, randomcoloR, pheatmap
+- **Visualization:** gggenes, ggraph, gridExtra, viridis, RColorBrewer, scales, pheatmap
 - **Graph analysis:** igraph
 - **Data manipulation:** data.table
 - **Utilities:** glue, fs
@@ -75,7 +69,7 @@ Both are pinned in `environment.yml`. `build_genome_catalog.py` hard-errors at s
 required_packages <- c("dplyr", "tidyr", "purrr", "stringr", "ggplot2",
                        "gggenes", "tidyverse", "ggraph", "tibble",
                        "gridExtra", "viridis", "igraph", "pander",
-                       "RColorBrewer", "scales", "randomcoloR", "glue",
+                       "RColorBrewer", "scales", "glue",
                        "fs", "data.table", "readr", "knitr", "rmarkdown",
                        "pheatmap")
 all_installed <- sapply(required_packages, require, character.only = TRUE, quietly = TRUE)
@@ -101,7 +95,7 @@ python  build_genome_catalog.py <config.yaml>
 Rscript prepare.R               <config.yaml>
 
 # Step 0  — materialise the missing per-focal neighbor TSVs.
-bash    run_species.sh          <config.yaml>
+bash    build_neighbor_lists.sh          <config.yaml>
 
 # Steps 1-6 — the analytical pipeline.
 Rscript pipeline.R              <config.yaml>
@@ -114,12 +108,12 @@ Working example config: `example.yaml` (template).
 ### Common issues
 
 1. **`build_genome_catalog.py` says "pyyaml not importable" or "cannot import gff_to_genes".**
-   The env isn't active. Run `conda activate strain-aware-operon` (or set `PYTHON=/path/to/env/bin/python build_genome_catalog.py ...`).
+   The env isn't active. Run `conda activate pansynteny` (or set `PYTHON=/path/to/env/bin/python build_genome_catalog.py ...`).
 
 2. **R fails with `GLIBCXX_3.4.30 not found` when loading `vroom`.**
    The system `Rscript` is being used instead of the env's. Either:
    ```bash
-   conda activate strain-aware-operon
+   conda activate pansynteny
    ```
    …or invoke the env's binary directly with the env's `lib/` on `LD_LIBRARY_PATH`:
    ```bash
@@ -155,12 +149,12 @@ The pipeline driver (`pipeline.R`) sources these R scripts from the `R/` subdire
 The Step 0a / Step 0 entry-point scripts live at the repo root, alongside the R drivers (`prepare.R`, `pipeline.R`):
 
 - `build_genome_catalog.py` — imports `scripts/gff_to_genes.py`
-- `run_species.sh` — calls `scripts/generate_neighbor_list.sh` → `scripts/get_neighbor.sh`
+- `build_neighbor_lists.sh` — calls `scripts/focal_neighbor_list.sh` → `scripts/get_neighbor.sh`
 
 Their helpers live under `scripts/` (each resolves siblings via its own path, so the chain works regardless of CWD):
 
 - `scripts/gff_to_genes.py`
-- `scripts/generate_neighbor_list.sh`
+- `scripts/focal_neighbor_list.sh`
 - `scripts/get_neighbor.sh`
 
 ## Data requirements

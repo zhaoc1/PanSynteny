@@ -28,7 +28,7 @@ load_job_config <- function(yaml_path) {
     stop("job.input_dir is required in <config.yaml>. Add the absolute path to your user-provided inputs (focal_meta TSV, etc.) under job:.")
   }
   if (is.null(raw$job$parallel_jobs)) {
-    stop("job.parallel_jobs is required in <config.yaml>. Add an integer (typical: 2) under job: to control run_species.sh's xargs -P fan-out.")
+    stop("job.parallel_jobs is required in <config.yaml>. Add an integer (typical: 2) under job: to control build_neighbor_lists.sh's xargs -P fan-out.")
   }
 
   replacements <- c(

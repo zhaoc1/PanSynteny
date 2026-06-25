@@ -22,7 +22,7 @@ Six things that aren't obvious from skimming the code:
 
 ## Run commands
 
-The full workflow is four ordered commands, all reading the same `<config.yaml>`. Everything runs under the `strain-aware-operon` conda env (both R and Python live there):
+The full workflow is four ordered commands, all reading the same `<config.yaml>`. Everything runs under the `pansynteny` conda env (both R and Python live there):
 
 ```bash
 # Step 0a — build the unified genome catalog (per-source membership + .genes paths,
@@ -34,8 +34,8 @@ python  build_genome_catalog.py <config.yaml>
 Rscript prepare.R               <config.yaml>
 
 # Step 0  — materialise the missing per-focal neighbor TSVs (fans
-#           generate_neighbor_list.sh -> get_neighbor.sh over gene_list.tsv).
-bash    run_species.sh          <config.yaml>
+#           focal_neighbor_list.sh -> get_neighbor.sh over gene_list.tsv).
+bash    build_neighbor_lists.sh          <config.yaml>
 
 # Steps 1-6 — the analytical pipeline.
 Rscript pipeline.R              <config.yaml>
@@ -43,7 +43,7 @@ Rscript pipeline.R              <config.yaml>
 
 Working example config: [example.yaml](example.yaml). `prepare.R` is cheap to re-run (always overwrites the focal_meta cache, the run_config.yaml snapshot, and gene_list.tsv). `pipeline.R` aborts at startup if the focal_meta cache is missing or any `is_focal == TRUE` centroid lacks its neighbor TSV under `neighbor_list/` — both errors point back to `prepare.R`.
 
-**Per-focal neighbor TSVs are now materialised in-repo.** `run_species.sh` consumes `gene_list.tsv` (the missing-list `prepare.R` writes) and fans `generate_neighbor_list.sh` over each focal; per-focal idempotency lives in that script. There is no longer an external preprocessing job to coordinate (v0.1.0 required one).
+**Per-focal neighbor TSVs are now materialised in-repo.** `build_neighbor_lists.sh` consumes `gene_list.tsv` (the missing-list `prepare.R` writes) and fans `focal_neighbor_list.sh` over each focal; per-focal idempotency lives in that script. There is no longer an external preprocessing job to coordinate (v0.1.0 required one).
 
 **Re-run skipping by cache.** Step 1 skips re-extraction if `step2_neighbors/neighbor_groups.RDS` exists; Step 2 skips if `step3_path/path_df.rds` exists. **To force a step to re-run, delete its cache file.**
 
@@ -88,8 +88,8 @@ Note the v0.2.0 step renumbering vs v0.1.0: parse was Step 5 → now Step 4; fig
 
 | File | Role |
 | --- | --- |
-| [run_species.sh](run_species.sh) | Top entry point: reads `gene_list.tsv` (the missing-list from `prepare.R`), fans `generate_neighbor_list.sh` over each focal in parallel. |
-| [generate_neighbor_list.sh](scripts/generate_neighbor_list.sh) | One focal centroid → its `<query>.tsv`. Joins the catalog `genes_info` (gene members of the focal) to `genome_toc` (`.genes` path per genome), then fans `get_neighbor.sh` per gene member. Idempotent on `-s "$outfile"`. |
+| [build_neighbor_lists.sh](build_neighbor_lists.sh) | Top entry point: reads `gene_list.tsv` (the missing-list from `prepare.R`), fans `focal_neighbor_list.sh` over each focal in parallel. |
+| [focal_neighbor_list.sh](scripts/focal_neighbor_list.sh) | One focal centroid → its `<query>.tsv`. Joins the catalog `genes_info` (gene members of the focal) to `genome_toc` (`.genes` path per genome), then fans `get_neighbor.sh` per gene member. Idempotent on `-s "$outfile"`. |
 | [get_neighbor.sh](scripts/get_neighbor.sh) | Innermost — emits one gene's ±`n_genes` flank from its `.genes` file. Has no hardcoded paths. |
 
 ### Data flow at a glance
@@ -105,7 +105,7 @@ Step 0    data.focal_meta (user TSV)
             --> {proj_dir}/step1_setup/gene_meta_full.tsv  (focal_meta cache)
             --> {proj_dir}/step1_setup/gene_list.tsv    (only missing focals)
 
-          run_species.sh + generate_neighbor_list.sh + get_neighbor.sh
+          build_neighbor_lists.sh + focal_neighbor_list.sh + get_neighbor.sh
             --> {data_dir}/{species_id}/list_of_neighbors/<focal_c80>.tsv  (7 cols, no header)
 
 pipeline.R Step 1    per-focal neighbor TSVs + catalog c80 tables
@@ -159,7 +159,7 @@ Computed once at the **(canonical × collapsed_path)** grain in `explode_canonic
 
 ### Shared genome_id contract
 
-`build_genome_catalog` and `generate_neighbor_list.sh` both derive `genome_id` from `gene_id` by stripping the trailing `_NNNNN` field. This works for both `GUT_GENOME000040_00388` and `GCF_900448275.1_00001`. The catalog's `genome_toc` is keyed by the same value. **If you add a new source whose gene_ids don't follow this convention, the TOC join in `generate_neighbor_list.sh` will silently miss those genes** (it warns to stderr on each miss but doesn't abort). Extend the derivation in both places (Python `genome_id_from_gene_id` + the awk in `generate_neighbor_list.sh`).
+`build_genome_catalog` and `focal_neighbor_list.sh` both derive `genome_id` from `gene_id` by stripping the trailing `_NNNNN` field. This works for both `GUT_GENOME000040_00388` and `GCF_900448275.1_00001`. The catalog's `genome_toc` is keyed by the same value. **If you add a new source whose gene_ids don't follow this convention, the TOC join in `focal_neighbor_list.sh` will silently miss those genes** (it warns to stderr on each miss but doesn't abort). Extend the derivation in both places (Python `genome_id_from_gene_id` + the awk in `focal_neighbor_list.sh`).
 
 ## Documentation map
 
@@ -197,7 +197,7 @@ Landmines that have caught people. Read before changing anything in these areas.
 
 - **Step 5 `fill_modes` is column-tolerant.** `run_step5_figures` filters `fill_modes` to drop any mode whose backing column is missing from the c80s tables (warning printed). Listing `beta` / `cor_to_b` / `sample_prevalence` on a minimal focal_meta is harmless — they just no-op. The minimal set that always works: `fill_gene` (derived) and any column that's in the c80s tables.
 
-- **Catalog `genes_info.tsv` has a header.** Awk consumers must `FNR==1 { next }`. `generate_neighbor_list.sh` already does; if you add a new awk reader, replicate it.
+- **Catalog `genes_info.tsv` has a header.** Awk consumers must `FNR==1 { next }`. `focal_neighbor_list.sh` already does; if you add a new awk reader, replicate it.
 
 ## Conventions worth knowing
 

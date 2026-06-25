@@ -45,6 +45,8 @@ load_job_config(args[1])
 
 species_id <- cfg_get(job_config, "species_id")
 
+cat("\n[0/6] Pre-step : driver setup (load focal table + reference tables)...\n")
+
 # Pipeline input: focal_c80_df is produced by Step 0b (`prepare.R`): prepare.R
 # reads the user-provided `focal_meta` TSV, optionally applies the |score_col|
 # thresholds (prepare: section), and caches the derived focal table here. This

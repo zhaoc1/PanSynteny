@@ -245,13 +245,15 @@ From the `neighbor` and `plot` sections of the YAML:
 **Driver section:** [pipeline.R:91-95](../pipeline.R#L91-L95) (one-line orchestrator call to [`run_step2_path_stitching`](../R/graph.R#L884))
 **Helper file:** [graph.R](../R/graph.R)
 
-### Input
+Step 2 is where individual focal neighborhoods stop being "lists of genes near a focal" and become **actual operon paths**. It walks each genome's neighborhoods as a directed graph and enumerates every maximal gene chain, so after this step an operon is a *path* - one row per per-genome occurrence - not a per-focal list.
 
-- `gene_neighbors` from Step 1 (one row per `(focal_c80, genome, neighbor_position)` with `neighbor_c80_coarse` and `neighbor_c80_fine`).
+### What it consumes
 
-### Output
+- `gene_neighbors` from Step 1 (one row per `(focal_c80, genome, neighbor_position)` with `neighbor_c80_coarse` and `neighbor_c80_fine`). This is the only input.
 
-- `path_df` (in-memory + RDS at [`path_df`](../R/model.R#L41)). One row per per-genome maximal path. Key columns:
+### What it produces
+
+- `path_df` (in-memory + RDS at [`path_df`](../R/model.R#L41)) - **the main output and the Step 2 re-run gate** (if this RDS exists, Step 2 is skipped; delete it to force re-stitching). One row per per-genome maximal path. Key columns:
   - `neighbor_genome`, `path_id`, `path_component_id` (graph-component id within that genome), `path_type` (pos/neg), `path_length`
   - `path_string` - `->`-joined `neighbor_gene_id`s
   - `c80_path_coarse` - `->`-joined coarse cluster labels
@@ -260,16 +262,16 @@ From the `neighbor` and `plot` sections of the YAML:
 - `esupport_df` (RDS at [`esupport_df`](../R/model.R#L42)). Per-edge support: count of focal `gene_member`s contributing to each `(from, to, path_type)` edge per genome, with `support_genes` / `support_c80s_coarse` / `support_c80s_fine` lists.
 - `path_genome_comp` - composite key added by the driver after re-loading `path_df`: `paste(path_genome, path_type, path_component_id, sep = "||")`. Step 3's join column.
 
-### Logic
+### The logic - one per-genome loop
 
-Single orchestrator: [`stitch_paths_across_focal_genes()`](../R/graph.R#L283). Per-genome loop:
+Single orchestrator: [`stitch_paths_across_focal_genes()`](../R/graph.R#L283) iterates **genome by genome** - no cross-genome edges are ever created; that is deferred to Step 3. For each genome:
 
-1. Re-derive an in-genome `position` from chromosomal `neighbor_gene_start`. The `anchor_index` is the row of the focal gene; `position = row_number - anchor_index`. **This overrides Step 1's focal-relative orientation.** All `gene_member`s within one genome thereby share a chromosomal frame (path direction is genome-relative, not focal-relative). Cross-genome direction unification is deferred to Step 3.
-2. For each association class (pos/neg in `path_label`), call [`make_positional_edges()`](../R/graph.R#L101) to convert positionally adjacent neighbors into directed `(from -> to)` edges. Self-loops dropped; duplicate edges from different focals kept distinct.
-3. Aggregate over all focals in this genome to produce `edge_support`: per `(from, to, path_type)`, count distinct supporting `gene_member`s and list them.
-4. For each association class, call [`get_maximal_paths_by_type()`](../R/graph.R#L171) to walk the support-weighted directed graph: each weakly connected component is enumerated for source-to-sink paths via DFS from each in-degree-0 node. **Errors out if the graph is not a DAG** - by construction it should be (chromosomal `position` is monotonic).
-5. Translate path nodes from `neighbor_gene_id` to two parallel renderings via lookup tables: `c80_path_coarse` and `c80_path_fine`. Both are kept so downstream length-sensitive analyses don't have to re-derive either.
-6. Stamp per-genome provenance, accumulate, and `bind_rows` across genomes.
+1. **Re-derive chromosomal position.** Within each focal copy (`gene_member`), sort neighbors by `neighbor_gene_start`, locate the focal's own row (`anchor_index = match(gene_member, neighbor_gene_id)`), and set `position = row_number - anchor_index`. **This overrides Step 1's focal-relative orientation** - every `gene_member` in the genome now shares one *chromosomal* frame (path direction is genome-relative, not focal-relative).
+2. **Build edges** (pos/neg separately) via [`make_positional_edges()`](../R/graph.R#L101): within each focal copy each neighbor points to the next in position order (`to = lead(...)`). Self-loops dropped; duplicate edges kept distinct. Edges encode adjacency in the *observed (filtered)* neighborhood, so an edge jumps any gap left by an upstream-filtered gene.
+3. **Aggregate edge support.** Per `(from, to, path_type)`, count distinct supporting `gene_member`s and list them -> `edge_support`.
+4. **Enumerate maximal paths** via [`get_maximal_paths_by_type()`](../R/graph.R#L171): build a directed graph, **hard-error if it is not a DAG** (a cycle signals a real upstream problem such as a tandem `A -> B -> A`), split into weakly connected components, and DFS from every in-degree-0 source to every out-degree-0 sink. *Every* source-to-sink path is returned (not just the longest) - cheap for chain-shaped neighborhoods, but exponential in a densely branched graph.
+5. **Render two label views.** Map each path's node ids to `c80_path_coarse` and `c80_path_fine` (plus endpoint clusters). Both are kept so downstream length-sensitive analyses don't have to re-derive either.
+6. **Stamp per-genome provenance, accumulate, and `bind_rows` across genomes.**
 
 After re-loading `path_df`, the driver builds `path_genome_comp` (the per-genome path key) and drops the now-redundant `path_genome` and `path_component_id`.
 

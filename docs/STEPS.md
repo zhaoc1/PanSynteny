@@ -317,12 +317,14 @@ Five TSVs under `step3_path/`, at three granularity **levels** (downstream code 
 Groups `path_df` on `(c80_path_coarse, path_length, path_type)`. One row per coarse operon shape per type. Records `n_genomes`, `neighbor_genomes` (`;`-joined), and `per_genome_path_w_ids` (`;`-joined `path_genome_comp`s - the provenance pointer back to the per-genome paths). Direction is **not** canonicalized here (e.g., `A->B->C` vs `C->B->A` remain two rows).
 
 **2. [`generate_canonical_path()`](../R/graph.R#L560) - canonicalize direction + survival cut.** The subtle one:
+
 - [`normalize_path()`](../R/graph.R#L492) decides forward vs reverse by lex-min of a *cleaned* token vector - [`clean_for_orientation()`](../R/graph.R#L462) strips synthetic `_`-prefixed small-ORF tokens and collapses adjacent duplicates, so direction keys off the **real-gene backbone**. The chosen direction is then applied to the **full** original token list (small ORFs retained). It only ever returns forward-full or reverse-full - never reorders or drops content.
 - Mirror-image rows now share one normalized string, so they get one surrogate `canonical_path_id`; their `n_genomes` are summed and provenance concatenated.
 - Then the `path_min_genomes` gate is applied. **This is the operon survival cut** - anything below it is dropped from L1 onward.
 
 **3. [`compute_joint_components()`](../R/graph.R#L639)**
 Builds an undirected, type-collapsed gene-level graph from all canonical paths and computes connected components, returning a `(node, joint_component_id)` map. Every centroid_80 in any canonical path is grouped with every c80 it is transitively adjacent to anywhere across the species pangenome. Two things are intentionally kept out of the graph:
+
 - **Type info** - dropped before building the undirected graph, so a hub gene appearing in both a `pos` and a `neg` path bridges them into one component.
 - **Synthetic small-ORF tokens** - stripped (via the same `clean_for_orientation` rule) inside [`get_edges_from_paths()`](../R/graph.R#L115) before edges are formed, so a per-focal synthetic label reused across two unrelated paths can no longer bridge them into one component. Because the strip acts on the token vector, real genes that flanked a small ORF stay directly adjacent (`A -> _s -> B` => `A -> B`), so no component is fragmented. The stored canonical path string keeps its small ORFs.
 
@@ -347,6 +349,7 @@ For each surviving canonical, walk the provenance chain `canonical_path_id -> co
 [`decorate_c80s_w_smallORFs()`](../R/parse.R#L95) - decode synthetic small-ORF labels into queryable `is_smallORF`, `centroid_80`, `smallORF_type`, and per-operon `n_smallORFs` / `n_focal` / `dist_to_smallORFs`. Run on both coarse and fine, with `group_key = "uid"` and `"uid_fine"` respectively.
 
 [`decorate_c80s_w_truncation()`](../R/parse.R#L188) - fine only. Adds:
+
 - `is_truncated` (per row) when `neighbor_gene_length < truncation_cutoff * neighbor_c80_length_coarse`
 - `truncate_ratio` (per row), floor-truncated to 3 decimals
 - `n_truncated` (per-isoform broadcast)

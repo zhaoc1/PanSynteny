@@ -13,7 +13,7 @@ reference) - read this for the *intuition*, that for the *details*.
 > - **Step 2** - per genome, pool all focal windows into one graph and DFS maximal paths; **overlapping windows merge here** (assembly).
 > - **Step 3** - across genomes, dedup identical path shapes -> canonicalize direction -> group c80s into joint components -> re-orient every path within a component to the longest one.
 
-<img src="figures/walkthrough_flowchart.png" alt="PanSynteny Steps 1-3 workflow" width="528">
+<img src="figures/walkthrough_flowchart_2col.png" alt="PanSynteny Steps 1-3 workflow" width="820">
 
 
 *Process diagram of Steps 1-3 (a detailed companion to the worked example below). Source:* [`figures/walkthrough_flowchart.dot`](figures/walkthrough_flowchart.dot).

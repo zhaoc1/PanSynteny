@@ -92,15 +92,22 @@ library(stringr)
 #' and when to use each, see `docs/PIPELINE.md`.
 #'
 #' @export
-decorate_c80s_w_smallORFs <- function(df, group_key = "uid") {
-  # c80_col is neighbor_c80_coarse for both level
+decorate_c80s_w_smallORFs <- function(df, group_key = "uid", smallORF_cutoff = 0) {
+  # c80_col is neighbor_c80_coarse for both level.
+  # `is_synthetic_orf` (leading "_") drives label parsing; `is_smallORF` is the
+  # broader flag and additionally captures genes that DID cluster into a real
+  # centroid_80 but are shorter than `smallORF_cutoff` bp. Default cutoff 0 keeps
+  # the length branch dormant (gene lengths are positive), so behavior is
+  # unchanged unless a caller passes a positive cutoff.
   df <- df %>%
     mutate(
-      is_smallORF = startsWith(as.character(neighbor_c80_coarse), "_"),
-      .stripped = if_else(is_smallORF, str_sub(as.character(neighbor_c80_coarse), 2L), as.character(neighbor_c80_coarse)),
-      centroid_80 = if_else(is_smallORF, str_replace(.stripped, "-[^-]+$", ""), .stripped),
-      smallORF_type = if_else(is_smallORF, str_replace(str_extract(.stripped, "[^-]+$"), "_\\d+$", ""), NA_character_)) %>%
-    select(-.stripped)
+      is_synthetic_orf = startsWith(as.character(neighbor_c80_coarse), "_"),
+      is_smallORF = is_synthetic_orf |
+        (!is.na(neighbor_gene_length) & neighbor_gene_length < smallORF_cutoff),
+      .stripped = if_else(is_synthetic_orf, str_sub(as.character(neighbor_c80_coarse), 2L), as.character(neighbor_c80_coarse)),
+      centroid_80 = if_else(is_synthetic_orf, str_replace(.stripped, "-[^-]+$", ""), .stripped),
+      smallORF_type = if_else(is_synthetic_orf, str_replace(str_extract(.stripped, "[^-]+$"), "_\\d+$", ""), NA_character_)) %>%
+    select(-.stripped, -is_synthetic_orf)
 
   df <- df %>%
     group_by(across(all_of(group_key))) %>%

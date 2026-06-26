@@ -2,7 +2,7 @@
 
 > Find the recurrent, co-localized syntenic gene neighborhoods your genes of interest live in, and how they vary across the strains of a bacterial species.
 
-**Status:** Testing release v0.3.0. Prototype - the YAML schema and output column set may change between 0.x.y versions. Not yet for production.
+**Status:** Testing release v0.4.0. Prototype - the YAML schema and output column set may change between 0.x.y versions. Not yet for production.
 
 **What it does.** Point PanSynteny at a pangenome (centroid_80 clusters from MIDAS) and a short list of focal genes you care about, and it finds the **recurrent, co-localized syntenic gene neighborhoods** those genes sit in, and shows how each one varies across the strains of the species. You get plain TSV tables and gene-arrow (gggenes) figures at three levels of detail: the consensus neighborhood, its length variants, and the exact genes in each genome. Optionally, it also pulls out the trait-associated gene blocks within each neighborhood.
 
@@ -47,8 +47,8 @@ Every key is documented in [USER_GUIDE.md section Configuration](docs/USER_GUIDE
 
 ```bash
 python build_genome_catalog.py my_run.yaml   # Step 0a - build the genome catalog from sources:
-Rscript prepare.R my_run.yaml                # Step 0  - cache focal_meta, list missing neighbor TSVs
-bash build_neighbor_lists.sh my_run.yaml     # Step 0  - materialise the neighbor TSVs
+Rscript prepare.R my_run.yaml                # Step 0b - cache focal_meta, list missing neighbor TSVs
+bash build_neighbor_lists.sh my_run.yaml     # Step 0c - materialise the neighbor TSVs
 Rscript pipeline.R my_run.yaml               # Steps 1-6 - neighborhoods -> figures -> trait blocks
 ```
 

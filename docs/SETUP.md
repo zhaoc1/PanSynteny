@@ -90,11 +90,11 @@ Once the env is set up, the workflow is four ordered commands, all reading the s
 #           derives <g>.genes in place for prokka sources via gff_to_genes.py).
 python build_genome_catalog.py <config.yaml>
 
-# Step 0  - snapshot the YAML, process focal_meta into the step1 cache,
+# Step 0b - snapshot the YAML, process focal_meta into the step1 cache,
 #           list any missing per-focal neighbor TSVs.
 Rscript prepare.R <config.yaml>
 
-# Step 0  - materialise the missing per-focal neighbor TSVs.
+# Step 0c - materialise the missing per-focal neighbor TSVs.
 bash build_neighbor_lists.sh <config.yaml>
 
 # Steps 1-6 - the analytical pipeline.
@@ -146,7 +146,7 @@ The pipeline driver (`pipeline.R`) sources these R scripts from the `R/` subdire
 
 `prepare.R` is a separate driver that sources only `config.R` + `model.R`.
 
-The Step 0a / Step 0 entry-point scripts live at the repo root, alongside the R drivers (`prepare.R`, `pipeline.R`):
+The Step 0a / 0b / 0c entry-point scripts live at the repo root, alongside the R drivers (`prepare.R`, `pipeline.R`):
 
 - `build_genome_catalog.py` - imports `scripts/gff_to_genes.py`
 - `build_neighbor_lists.sh` - calls `scripts/focal_neighbor_list.sh` -> `scripts/get_neighbor.sh`
@@ -168,7 +168,7 @@ The pipeline expects:
   - **`is_focal` derivation:** if `prepare.score_col` is set, prepare.R derives `is_focal` from `|score_col| >= focal_cutoff` and **overwrites** any input `is_focal` (loud `warning()`). Set `prepare.score_col: ""` to preserve a hand-curated `is_focal`.
 - **Project output root** (`job.proj_dir`): writable; used as-is (include the species_id in the value if you want per-species isolation).
 - **Data root** (`data.data_dir`): writable; the per-focal neighbor TSVs land under `<data_dir>/<species_id>/list_of_neighbors/`. (Shared across runs.)
-- **Project root** (`job.proj_dir`): writable; the genome catalog + Step 0 cache (`step1_setup/`) and every Step 1-6 output land under `<proj_dir>/`. (Per-run.)
+- **Project root** (`job.proj_dir`): writable; the genome catalog + Step 0b cache (`step1_setup/`) and every Step 1-6 output land under `<proj_dir>/`. (Per-run.)
 - **Optional prokka sources** (declared in `sources:`): one directory per genome with `<genome>/<genome>.gff` (the catalog build derives `.genes` from it).
 
 See [USER_GUIDE.md section Configuration](USER_GUIDE.md#configuration-yaml) for the full YAML schema.

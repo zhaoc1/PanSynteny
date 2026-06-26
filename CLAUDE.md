@@ -18,7 +18,7 @@ Six things that aren't obvious from skimming the code:
 
 6. **`focal_min_genomes` != `path_min_genomes`** despite sounding interchangeable. Step 1 cut on per-focal pattern recurrence; Step 3+5 cut on per-canonical-operon recurrence. Different scopes; usually but not necessarily the same value.
 
-**Project status.** v0.3.0 testing release published to `github.com/zhaoc1/PanSynteny` (private). Schema may shift between 0.x.y versions before 1.0.
+**Project status.** v0.4.0 testing release published to `github.com/zhaoc1/PanSynteny` (private). Schema may shift between 0.x.y versions before 1.0.
 
 ## Run commands
 
@@ -29,11 +29,11 @@ The full workflow is four ordered commands, all reading the same `<config.yaml>`
 #           merged into two artefacts the rest of the chain consumes).
 python  build_genome_catalog.py <config.yaml>
 
-# Step 0  - process the user-provided focal_meta TSV; cache to step1; enumerate
+# Step 0b - process the user-provided focal_meta TSV; cache to step1; enumerate
 #           any missing per-focal neighbor TSVs.
 Rscript prepare.R               <config.yaml>
 
-# Step 0  - materialise the missing per-focal neighbor TSVs (fans
+# Step 0c - materialise the missing per-focal neighbor TSVs (fans
 #           focal_neighbor_list.sh -> get_neighbor.sh over gene_list.tsv).
 bash    build_neighbor_lists.sh          <config.yaml>
 
@@ -64,7 +64,7 @@ Single R script per pipeline stage; `pipeline.R` is the linear driver and reads 
 | File | Role |
 | --- | --- |
 | [pipeline.R](pipeline.R) | Driver. Sources every helper, loads config, calls `run_step{1..6}_*` in order. |
-| [prepare.R](prepare.R) | Step 0. Snapshots `<config.yaml>` to the proj_dir; reads `data.focal_meta` from YAML, optionally applies `\|score_col\|` thresholds, caches to `get_target("focal_meta")`; enumerates missing per-focal neighbor TSVs. Sources only `config.R` + `model.R`. |
+| [prepare.R](prepare.R) | Step 0b. Snapshots `<config.yaml>` to the proj_dir; reads `data.focal_meta` from YAML, optionally applies `\|score_col\|` thresholds, caches to `get_target("focal_meta")`; enumerates missing per-focal neighbor TSVs. Sources only `config.R` + `model.R`. |
 | [config.R](R/config.R) | YAML loader. `load_job_config()` flattens every scalar YAML section into a single `job_config` env; `cfg_get(job_config, "key")` is the only accessor. List sections (e.g. `sources:`) are silently skipped. |
 | [model.R](R/model.R) | `target_layout()` - single source of truth for every input + output file path keyed by name. `get_target("key")` resolves against active config. The `# MWAS (parked)` block at the bottom is reserved for re-integration and not read by the current pipeline. |
 | [neighbor.R](R/neighbor.R) | Step 1: per-focal neighborhood extraction. |
@@ -84,7 +84,7 @@ Note the v0.2.0 step renumbering vs v0.1.0: parse was Step 5 -> now Step 4; figu
 | [build_genome_catalog.py](build_genome_catalog.py) | Reads `sources:` from the YAML; for each source streams membership rows to a merged `catalog_genes_info.tsv` (`gene_id <TAB> centroid_80 <TAB> gene_length`), accumulates a `catalog_genome_toc.tsv` (`genome_id <TAB> .genes path`), converts prokka `.gff -> .genes` in place via `gff_to_genes.py`, dup-checks genome_ids across sources. Outputs land under `{proj_dir}/step1_setup/` (per-run). |
 | [gff_to_genes.py](scripts/gff_to_genes.py) | Prokka GFF3 -> MIDAS `.genes` TSV converter (uses `gffutils`). Imported in-process by `build_genome_catalog.py`. |
 
-### Step 0 - neighbor-TSV materialisation (bash chain)
+### Step 0c - neighbor-TSV materialisation (bash chain)
 
 | File | Role |
 | --- | --- |
@@ -100,12 +100,12 @@ Step 0a   sources: (UHGG midasdb + ECOR prokka + ...)
             --> {proj_dir}/step1_setup/catalog_genome_toc.tsv  (genome_id, .genes path)
             --> per-prokka-genome <g>/<g>.genes  (in place next to <g>.gff)
 
-Step 0    data.focal_meta (user TSV)
+Step 0b   data.focal_meta (user TSV)
             --> {proj_dir}/step1_setup/run_config.yaml  (config snapshot)
             --> {proj_dir}/step1_setup/gene_meta_full.tsv  (focal_meta cache)
             --> {proj_dir}/step1_setup/gene_list.tsv    (only missing focals)
 
-          build_neighbor_lists.sh + focal_neighbor_list.sh + get_neighbor.sh
+Step 0c   build_neighbor_lists.sh + focal_neighbor_list.sh + get_neighbor.sh
             --> {data_dir}/{species_id}/list_of_neighbors/<focal_c80>.tsv  (7 cols, no header)
 
 pipeline.R Step 1    per-focal neighbor TSVs + catalog c80 tables

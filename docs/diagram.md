@@ -1,6 +1,6 @@
 # YAML → pipeline data-flow diagram
 
-This file maps every YAML key in [example.yaml](../example.yaml) to the script that consumes it. The R pipeline reads via `cfg_get(job_config, "<key>")`; the bash + Python step-0 chain reads via its own `yaml_get` helper (or `yaml.safe_load` in Python). `sources:` is a list, not a scalar section - it bypasses `config.R`'s flatten loop and is consumed only by `build_genome_catalog.py`.
+This file maps every YAML key in [example.yaml](../example.yaml) to the script that consumes it. The R pipeline reads via `cfg_get(job_config, "<key>")`; the bash + Python Step 0a/0c chain reads via its own `yaml_get` helper (or `yaml.safe_load` in Python). `sources:` is a list, not a scalar section - it bypasses `config.R`'s flatten loop and is consumed only by `build_genome_catalog.py`.
 
 The only YAML key consumed by more than one step is **`path.path_min_genomes`** (Steps 3 and 4). Every other key has a single owner.
 
@@ -23,7 +23,7 @@ data.n_genes ────────│──┐    │ build_genome_catalog.py
                      │  │                 │ catalog (Step 0a out)
                      │  │                 ▼
                      ▼  │    ┌─────────────────────────┐
-data.focal_meta ────────│───►│   prepare.R   (Step 0)  │
+data.focal_meta ────────│───►│   prepare.R   (Step 0b) │
 prepare.score_col ──────│───►│                         │
 prepare.inclusion_... ──│───►│  snapshot run_config;   │
 prepare.focal_cutoff ───│───►│  process focal_meta;    │
@@ -33,7 +33,7 @@ prepare.focal_cutoff ───│───►│  process focal_meta;    │
                         │                 ▼
                         └───►┌─────────────────────────┐
                              │ build_neighbor_lists.sh │
-                             |         (Step 0)        │
+                             |         (Step 0c)       │
                              │  → focal_neighbor_      │
                              │      list.sh            │
                              │  → get_neighbor.sh      │
@@ -147,6 +147,6 @@ comm -23 \
 grep -hnE 'cfg_get\(job_config, "[^"]+"\)' R/*.R *.R | \
   sed -E 's|^([^:]+):([0-9]+):.*"([^"]+)".*|\3\t\1:\2|' | sort
 
-# bash/python yaml keys (Step 0a + Step 0 chain)
+# bash/python yaml keys (Step 0a + Step 0c chain)
 grep -hnE 'yaml_get [^"]*"[a-z._]+"' *.sh | sed -E 's/.*"([^"]+)".*/\1/' | sort -u
 ```

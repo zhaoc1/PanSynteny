@@ -2,7 +2,7 @@
 # ------------------------------------------------------------------------------
 # build_neighbor_lists.sh  <config.yaml>
 #
-# Step 0 entry point: materialise the per-focal neighbor TSVs that pipeline.R consumes. 
+# Step 0c entry point: materialise the per-focal neighbor TSVs that pipeline.R consumes.
 # Fans focal_neighbor_list.sh across every focal centroid listed in gene_list.tsv.
 #
 # Run order:

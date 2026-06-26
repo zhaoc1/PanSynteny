@@ -113,20 +113,36 @@ make_positional_edges <- function(df, assoc = "pos") {
 
 
 get_edges_from_paths <- function(df, edge_type) {
-  # Expand paths into edges
-  df %>%
-    filter(path_type == edge_type) %>%
-    rowwise() %>%
-    mutate(c80_genes = strsplit(c80_path_coarse_canonical, " → ")) %>%
-    ungroup() %>%
-    select(collapsed_path_id, c80_genes) %>% #neighbor_genome
-    unnest_wider(c80_genes, names_sep = "_") %>%
-    pivot_longer(cols = starts_with("c80_genes_"), values_to = "gene", names_prefix = "c80_genes_") %>%
-    group_by(collapsed_path_id) %>% #neighbor_genome
-    mutate(next_gene = lead(gene)) %>%
-    filter(!is.na(next_gene)) %>%
-    ungroup() %>%
-    select(from = gene, to = next_gene, collapsed_path_id) #neighbor_genome
+  # Expand each canonical path into directed (from -> to) edges between
+  # CONSECUTIVE c80 tokens. Used only by compute_joint_components().
+  #
+  # Synthetic small-ORF tokens (`_`-prefixed) are stripped via
+  # clean_for_orientation() BEFORE the tokens are paired, exactly as the
+  # direction step does. Two intended consequences:
+  #   * they are never graph nodes, so a per-focal synthetic label reused
+  #     across two unrelated paths can no longer bridge them into one
+  #     joint component;
+  #   * because cleaning acts on the token vector, real genes that flanked a
+  #     small ORF stay directly adjacent (A -> _s -> B  =>  A -> B), so no
+  #     component is fragmented.
+  # The stored path string (`c80_path_coarse_canonical`) is left untouched -
+  # the path keeps its small ORFs everywhere else.
+  df <- df %>% filter(path_type == edge_type)
+  if (nrow(df) == 0) return(NULL)
+
+  edge_list <- lapply(seq_len(nrow(df)), function(i) {
+    toks <- clean_for_orientation(
+      strsplit(df$c80_path_coarse_canonical[[i]], " → ", fixed = TRUE)[[1]]
+    )
+    if (length(toks) < 2) return(NULL)  # 0 or 1 real token -> no edges
+    data.frame(
+      from = toks[-length(toks)],
+      to   = toks[-1],
+      collapsed_path_id = df$collapsed_path_id[[i]],
+      stringsAsFactors = FALSE
+    )
+  })
+  do.call(rbind, edge_list)
 }
 
 
@@ -444,6 +460,12 @@ collapse_paths_across_genomes <- function(path_df) {
 # The chosen direction is applied to the original full vector, so synthetic
 # ORFs and adjacent duplicates remain in the stored canonical.
 clean_for_orientation <- function(tokens) {
+  # Only SYNTHETIC small-ORF tokens (the `_`-prefixed labels minted in Step 1)
+  # are dropped from the direction decision. Length-based small ORFs that
+  # clustered into a real centroid_80 (flagged is_smallORF via smallORF_cutoff
+  # in decorate_c80s_w_smallORFs) are NOT stripped here and DO still influence
+  # orientation - by design, since the token is an ordinary c80 id and such
+  # genes are real, reproducible backbone members.
   tokens <- tokens[!startsWith(tokens, "_")]
   if (length(tokens) <= 1) return(tokens)
   tokens[c(TRUE, tokens[-1] != tokens[-length(tokens)])]
@@ -682,8 +704,14 @@ decorate_paths_with_components <- function(canonical_paths, joint_component_map)
   canonical_paths_genes <- canonical_paths %>%
     select(canonical_path_id, c80_path_coarse_canonical) %>%
     mutate(gene = strsplit(c80_path_coarse_canonical, " → ")) %>%
-    unnest(gene)
-  
+    unnest(gene) %>%
+    # Synthetic small-ORF tokens are not nodes in compute_joint_components()
+    # (see get_edges_from_paths), so exclude them here too - otherwise they
+    # left-join to NA and could leak into joint_component_ids. A path's real
+    # backbone genes are all co-component by construction, so dropping the
+    # small ORFs never changes its component id.
+    filter(!startsWith(gene, "_"))
+
   # Map each gene to its graph/component ID.
   canonical_paths_genes <- canonical_paths_genes %>%
     left_join(joint_component_map, by = c("gene" = "node"))

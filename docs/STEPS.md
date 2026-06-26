@@ -382,6 +382,8 @@ From `path`:
 **Driver section:** [pipeline.R:109-129](../pipeline.R#L109-L129) (Step 4 / Step 5 orchestrator calls - [`run_step4_parse`](../R/parse.R#L664) and [`run_step5_figures`](../R/plot.R#L652))
 **Helper files:** [parse.R](../R/parse.R) (data prep), [plot.R](../R/plot.R) (plotters)
 
+**What Step 4 is for.** Step 3 emitted the L1/L2/L3 tables for *every* canonical neighborhood. Step 4 creates no new operons - it **summarizes** them, **selects** the well-supported isoforms, **samples one representative genome** per surviving isoform, and **writes the ordered per-gene gene-id lists** that feed an external BLAST workflow. (Step 5, below, renders the selected sets as gggenes figures.)
+
 The terminal post-processing block, split across two orchestrators: [`run_step4_parse`](../R/parse.R) (summaries, fine-coverage selection sets, exemplar-genome sampling, per-(isoform, genome) BLAST gene-id files) and [`run_step5_figures`](../R/plot.R) (multi-fill gggenes plots - global and per-joint-component, faceted by `updated_path_type`). Both are designed to stay re-runnable in isolation: the three Step-3 TSVs (Step 4) and the four selection-and-c80s TSVs (Step 5) are loaded at the call site in [pipeline.R](../pipeline.R) and passed in as explicit arguments, so the helper functions themselves contain no `read_delim` calls.
 
 ### Input
@@ -396,10 +398,21 @@ In-memory from Step 1:
 
 ### Output
 
-- `coarse_summary` / `fine_summary` (in-memory). One row per `uid` and per `uid_fine` respectively, with per-operon counts (`n_genes`, `n_smallORFs`, `n_focal`, `n_truncated`, `n_fragmented_c80s`) and a `coarse_path_string` / `fine_path_string` rendering. No filter is applied inside the summarizer; the caller filters.
-- `selected_fine` (in-memory). Fine isoforms surviving `n_fine_genomes >= ceiling(path_min_genomes * fine_coverage_ratio)`. The selection set for everything downstream in this block.
-- `selected_coarse` (in-memory). `coarse_summary %>% semi_join(selected_fine, by = "uid")` - the coarse uids whose fine isoforms made it through.
-- `fine_long` (in-memory). Long-format per-gene table, one row per gene of each sampled `(uid_fine, neighbor_genome)`. Built in two stages by [`sample_genome_from_fine_paths`](../R/parse.R#L385) (12 columns) and then [`enrich_fine_long`](../R/parse.R#L470) (joins per-isoform context from `c80s_fine`).
+**Step 4 produces four kinds of artifact** (all written under `step4_parse/`; Step 5 adds the PDFs under `step5_figures/`):
+
+| Kind | Artifact(s) | Grain | Role |
+|---|---|---|---|
+| **Summaries** | `coarse_recurring_operons.tsv` (`coarse_summary`), `fine_isoform_priorities.tsv` (`fine_summary`) | one row per `uid` / `uid_fine` | human-readable roll-up with per-operon counts |
+| **Selection sets** | `selected_coarse.tsv`, `selected_fine.tsv` | surviving `uid` / `uid_fine` | the fine-coverage survival filter - gates all downstream plotting + BLAST |
+| **Sampled long table** | `fine_long.tsv` | one row per gene of one sampled genome per surviving isoform | per-gene coordinates + trait / flag context |
+| **BLAST gene lists** | `genome_paths/fine_<uid_fine>_<genome>.tsv` | one file per `(isoform, genome)` | bare ordered gene-ids -> external BLAST |
+
+Detail on each:
+
+- `coarse_summary` / `fine_summary` (written to `coarse_recurring_operons.tsv` / `fine_isoform_priorities.tsv`). One row per `uid` and per `uid_fine` respectively, with per-operon counts (`n_genes`, `n_smallORFs`, `n_focal`, `n_truncated`, `n_fragmented_c80s`) and a `coarse_path_string` / `fine_path_string` rendering. No filter is applied inside the summarizer; the caller filters.
+- `selected_fine` (written to `selected_fine.tsv`). Fine isoforms surviving `n_fine_genomes >= ceiling(path_min_genomes * fine_coverage_ratio)`. The selection set for everything downstream in this block.
+- `selected_coarse` (written to `selected_coarse.tsv`). `coarse_summary %>% semi_join(selected_fine, by = "uid")` - the coarse uids whose fine isoforms made it through.
+- `fine_long` (written to `fine_long.tsv`; returned to the driver). Long-format per-gene table, one row per gene of each sampled `(uid_fine, neighbor_genome)`. Built in two stages by [`sample_genome_from_fine_paths`](../R/parse.R#L385) (12 columns) and then [`enrich_fine_long`](../R/parse.R#L470) (joins per-isoform context from `c80s_fine`).
   - **Sampler output (12 cols):** `uid_fine`, `neighbor_genome`, `position_in_path`, `gene_id`, `neighbor_c80_coarse`, `neighbor_c80_fine`, `neighbor_contig_id`, `neighbor_gene_start`, `neighbor_gene_end`, `neighbor_gene_strand`, `neighbor_gene_type`, `neighbor_gene_length` (per-gene observed length from `gene_neighbors`).
   - **Enrichment adds** the contiguous range `uid_fine:centroid_80` from `c80s_fine`, minus three columns dropped to avoid collisions: `neighbor_c80_coarse` and `neighbor_c80_fine` (already present, identical values per joined row), and `neighbor_gene_length` (intentionally not merged - the c80s_fine version is per-isoform consensus length, not per-gene observed; same name, different semantics).
   - **Net added columns:** `n_fine_genomes`, `neighbor_c80_length_coarse`, `genome_prevalence`, `sample_prevalence`, `cor_to_b`, `focal_label`, `beta`, `trait`, `genome_counts`, `is_focal`, `is_smallORF`, `smallORF_type`, `n_smallORFs`, `n_focal`, `dist_to_smallORFs`, `is_truncated`, `truncate_ratio`, `n_truncated`, `is_fragmented`, `fragmented_c80s`, `n_fragmented_c80s`, `centroid_80_genome_counts`, `centroid_80`.
@@ -408,7 +421,7 @@ In-memory from Step 1:
 
 ### Logic
 
-Six stages.
+**Step 4 is five stages** (1-5 below). The gggenes figures that follow are **Step 5**, not a sixth Step-4 stage - they live in their own subsection.
 
 **1. Summaries.** [`summarize_coarse_operons()`](../R/parse.R#L260) and [`summarize_fine_isoforms()`](../R/parse.R#L317) roll up the decorated c80s tables to one row per operon / isoform. Both are filter-free - the carry-through includes only the columns needed for downstream sampling and plotting (notably `uid` is carried into `fine_summary` so the post-hoc coarse-summary merge can group fine isoforms by their coarse parent without parsing `uid_fine` strings).
 
@@ -426,7 +439,9 @@ Coarse-level BLAST hits are produced **post-hoc**, not by this block: aggregate 
 
 **5. BLAST gene lists.** [`write_blast_gene_lists()`](../R/parse.R#L500). Long-format consumer: groups the enriched `fine_long` by `(uid_fine, neighbor_genome)`, sorts by `position_in_path`, and writes one TSV per group. The writer reads only `(uid_fine, neighbor_genome, position_in_path, gene_id)` - extra enrichment columns ride along harmlessly. This is the last stage of `run_step4_parse`; the figure-rendering stage below is owned by Step 5.
 
-**6. Step 5 - gggenes figures.** [`run_step5_figures()`](../R/plot.R#L652) wires four plotters at global and per-component scope: [`plot_coarse_operons()`](../R/plot.R#L404) and [`plot_fine_operons()`](../R/plot.R#L456) (one PDF per `fill_by` mode at the global level), [`plot_coarse_operons_by_component()`](../R/plot.R#L501) and [`plot_fine_operons_by_component()`](../R/plot.R#L556) (one PDF per `(joint_component_id, fill_by)` under `02_by_component_coarse/` and `03_by_component_fine/`, faceted by `updated_path_type`). Each plotter consumes its summary as a `semi_join` filter on `uid` / `uid_fine`. The shared layout helper [`.layout_operon_tracks()`](../R/plot.R#L245) computes per-track positions and a single `fill_symbol` glyph per gene with this precedence (top wins):
+### Step 5 logic - gggenes figures
+
+[`run_step5_figures()`](../R/plot.R#L652) wires four plotters at global and per-component scope: [`plot_coarse_operons()`](../R/plot.R#L404) and [`plot_fine_operons()`](../R/plot.R#L456) (one PDF per `fill_by` mode at the global level), [`plot_coarse_operons_by_component()`](../R/plot.R#L501) and [`plot_fine_operons_by_component()`](../R/plot.R#L556) (one PDF per `(joint_component_id, fill_by)` under `02_by_component_coarse/` and `03_by_component_fine/`, faceted by `updated_path_type`). Each plotter consumes its summary as a `semi_join` filter on `uid` / `uid_fine`. The shared layout helper [`.layout_operon_tracks()`](../R/plot.R#L245) computes per-track positions and a single `fill_symbol` glyph per gene with this precedence (top wins):
 
 | Glyph | Condition |
 |---|---|

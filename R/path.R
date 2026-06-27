@@ -277,6 +277,13 @@ build_canonical_paths_c80s <- function(c_paths, c80_variants_mapping, focal_c80_
     dplyr::rename(neighbor_c80_coarse = gene) %>%
     left_join(c_paths %>% select(uid, joint_component_ids, canonical_path_id, path_type, n_genomes, neighbor_genomes) %>% unique(), by = c("canonical_path_id"))
 
+  # Synthetic `_`-prefixed ORFs are excluded from joint-component computation,
+  # leaving their per-gene joint_component_id = NA. Inherit their path's
+  # component so downstream per-component plotters/labels handle them.
+  c80s_coarse <- c80s_coarse %>%
+    mutate(joint_component_id = coalesce(joint_component_id,
+                                         suppressWarnings(as.integer(joint_component_ids))))
+
   # Coarse gene length: collapse c80_variants_mapping to one row per c80 (max length).
   # IMPORTANT - the resulting `neighbor_gene_length` column is misnamed.
   # It is NOT a single observed gene's length. It is the MAXIMUM length
@@ -364,6 +371,13 @@ build_canonical_paths_fine_c80s <- function(c_paths_fine, c80_variants_mapping,
     left_join(jc_map, by = c("neighbor_c80_coarse" = "node")) %>%
     left_join(focal_c80_df, by = c("neighbor_c80_coarse" = "focal_c80")) %>%
     left_join(cluster_80, by = c("neighbor_c80_coarse" = "c80"))
+
+  # Synthetic `_`-prefixed ORFs are excluded from joint-component computation,
+  # leaving their per-gene joint_component_id = NA. Inherit their path's
+  # component (mirror of build_canonical_paths_c80s).
+  fine_c80s <- fine_c80s %>%
+    mutate(joint_component_id = coalesce(joint_component_id,
+                                         suppressWarnings(as.integer(joint_component_ids))))
 
   # Fill in genome_prevalence for short-gene rows from the short_gene_prevalence mapping.
   fine_c80s <- fine_c80s %>%

@@ -596,7 +596,7 @@ decorate_with_updated_path_type <- function(df) {
   if (!"c80_label" %in% names(df)) df <- assign_c80_label(df, value_col = "beta")
 
   per_path <- df %>%
-    filter(!is.na(c80_label)) %>%
+    filter(!is.na(c80_label), !startsWith(neighbor_c80_coarse, "_")) %>%
     group_by(joint_component_id, canonical_path_id, path_type) %>%
     summarise(
       c80_label_combo = paste(sort(unique(c80_label)), collapse = ","),

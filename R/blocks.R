@@ -48,6 +48,11 @@ library(purrr)
 #'   that consumes this output.
 #' @export
 keep_focal_blocks <- function(df, allow_gaps = 2) {
+  # Drop synthetic `_`-prefixed ORF rows up front so block geometry (gap
+  # distances) is computed over the same rows as before they inherited a
+  # component. Real length-variant backbone genes are untouched.
+  df <- df %>% filter(!startsWith(neighbor_c80_coarse, "_"))
+
   keys <- intersect(c("joint_component_id", "canonical_path_id", "path_type"), names(df))
 
   # Stage 1: tag each row focal-or-not, and save its global position so the

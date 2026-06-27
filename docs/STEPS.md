@@ -288,7 +288,7 @@ None at this stage. Inherits from Step 1.
 
 ## STEP 3 - Cross-genome consolidation -> three granularity levels
 
-**Driver section:** [pipeline.R:98-106](../pipeline.R#L98-L106) (orchestrator call to [`run_step3_consolidation`](../R/path.R#L425))
+**Driver section:** [pipeline.R:98-106](../pipeline.R#L98-L106) (orchestrator call to [`run_step3_consolidation`](../R/path.R#L439))
 **Helper files:** [graph.R](../R/graph.R) (canonicalization + components), [path.R](../R/path.R) (expansions), [parse.R](../R/parse.R) (decorators)
 
 Step 3 is the analytical core: it consolidates the per-genome paths from Step 2 into **canonical operons**, emitted at three granularity levels with three stable IDs that all downstream code joins on (never on path strings). Unlike Steps 1-2, it has **no on-disk cache gate** - it always re-runs.
@@ -343,7 +343,8 @@ For each surviving canonical, walk the provenance chain `canonical_path_id -> co
 **8. Per-gene expansions + decorators**
 
 - [`build_canonical_paths_c80s()`](../R/path.R#L265) - split each canonical path into per-gene rows at **coarse** resolution. Attaches max-over-isoforms gene length, gene metadata, cluster_80 metadata, and small-ORF prevalence. **`neighbor_gene_length` here is the max across isoforms of the cluster** - not a single observed gene's length; use the fine table for exact per-isoform lengths.
-- [`build_canonical_paths_fine_c80s()`](../R/path.R#L343) - same but at **isoform** resolution. `neighbor_gene_length` is the exact per-isoform value. Joint-component, gene-meta, and cluster-80 annotations are inherited via the coarse `neighbor_c80_coarse` (no isoform granularity exists for those).
+- [`build_canonical_paths_fine_c80s()`](../R/path.R#L350) - same but at **isoform** resolution. `neighbor_gene_length` is the exact per-isoform value. Joint-component, gene-meta, and cluster-80 annotations are inherited via the coarse `neighbor_c80_coarse` (no isoform granularity exists for those).
+- **Synthetic small-ORF component inherit (both builders).** Synthetic `_`-prefixed tokens are kept out of the joint-component graph (stage 3), so their per-gene `joint_component_id` would otherwise land `NA` in both c80s tables. Each builder `coalesce`s that `NA` to the path's `joint_component_ids`, so synthetic rows inherit their path's component. This stops the per-component plotters (Step 5) from faceting on an empty `NA` group, which used to abort with `combine_vars: Faceting variables must have at least one value`. Two consumers that previously leaned on the `NA` to *exclude* synthetic ORFs now use an explicit `startsWith(neighbor_c80_coarse, "_")` guard instead - [`keep_focal_blocks`](../R/blocks.R#L50) (Step 6) and [`decorate_with_updated_path_type`](../R/parse.R#L595) (Step 5 faceting) - so block geometry and path-type labels are unchanged. The guard is the synthetic-token test, **not** `is_smallORF` (a broader superset that also flags real length-variant backbone genes, which must keep counting).
 - [`decorate_c80s_w_smallORFs()`](../R/parse.R#L95) - decode synthetic small-ORF labels into queryable `is_smallORF`, `centroid_80`, `smallORF_type`, and per-operon `n_smallORFs` / `n_focal` / `dist_to_smallORFs`. Run on both coarse and fine, with `group_key = "uid"` and `"uid_fine"` respectively.
 - [`decorate_c80s_w_truncation()`](../R/parse.R#L188) - **fine only** (the coarse `neighbor_gene_length` is max-over-isoforms, so a truncation test there would only mean "even the longest isoform is short"). Adds:
     - `is_truncated` (per row) when `neighbor_gene_length < truncation_cutoff * neighbor_c80_length_coarse`
@@ -412,10 +413,7 @@ Detail on each:
 - `coarse_summary` / `fine_summary` (written to `coarse_recurring_operons.tsv` / `fine_isoform_priorities.tsv`). One row per `uid` and per `uid_fine` respectively, with per-operon counts (`n_genes`, `n_smallORFs`, `n_focal`, `n_truncated`, `n_fragmented_c80s`) and a `coarse_path_string` / `fine_path_string` rendering. No filter is applied inside the summarizer; the caller filters.
 - `selected_fine` (written to `selected_fine.tsv`). Fine isoforms surviving `n_fine_genomes >= ceiling(path_min_genomes * fine_coverage_ratio)`. The selection set for everything downstream in this block.
 - `selected_coarse` (written to `selected_coarse.tsv`). `coarse_summary %>% semi_join(selected_fine, by = "uid")` - the coarse uids whose fine isoforms made it through.
-- `fine_long` (written to `fine_long.tsv`; returned to the driver). Long-format per-gene table, one row per gene of each sampled `(uid_fine, neighbor_genome)`. Built in two stages by [`sample_genome_from_fine_paths`](../R/parse.R#L385) (12 columns) and then [`enrich_fine_long`](../R/parse.R#L470) (joins per-isoform context from `c80s_fine`).
-  - **Sampler output (12 cols):** `uid_fine`, `neighbor_genome`, `position_in_path`, `gene_id`, `neighbor_c80_coarse`, `neighbor_c80_fine`, `neighbor_contig_id`, `neighbor_gene_start`, `neighbor_gene_end`, `neighbor_gene_strand`, `neighbor_gene_type`, `neighbor_gene_length` (per-gene observed length from `gene_neighbors`).
-  - **Enrichment adds** the contiguous range `uid_fine:centroid_80` from `c80s_fine`, minus three columns dropped to avoid collisions: `neighbor_c80_coarse` and `neighbor_c80_fine` (already present, identical values per joined row), and `neighbor_gene_length` (intentionally not merged - the c80s_fine version is per-isoform consensus length, not per-gene observed; same name, different semantics).
-  - **Net added columns:** `n_fine_genomes`, `neighbor_c80_length_coarse`, `genome_prevalence`, `sample_prevalence`, `cor_to_b`, `focal_label`, `beta`, `trait`, `genome_counts`, `is_focal`, `is_smallORF`, `smallORF_type`, `n_smallORFs`, `n_focal`, `dist_to_smallORFs`, `is_truncated`, `truncate_ratio`, `n_truncated`, `is_fragmented`, `fragmented_c80s`, `n_fragmented_c80s`, `centroid_80_genome_counts`, `centroid_80`.
+- `fine_long` (written to `fine_long.tsv`; returned to the driver). Long-format per-gene table, one row per gene of each sampled `(uid_fine, neighbor_genome)`. Built in two stages - the 12-column sampler [`sample_genome_from_fine_paths`](../R/parse.R#L385) then per-isoform enrichment [`enrich_fine_long`](../R/parse.R#L470) (joins trait stats, small-ORF / truncation / fragmentation flags, and `centroid_80` from `c80s_fine`). See Logic stages 3-4 for the column-level detail.
 - Per-`(uid_fine, neighbor_genome)` gene-id TSVs under [`parse_genome_paths_dir`](../R/model.R#L54), file pattern `fine_<uid_fine>_<neighbor_genome>.tsv`. Bare gene-id lists in canonical-path order; the input to an external BLAST workflow.
 - gggenes plots of the selected operons / isoforms under [`parse_coarse_figures`](../R/model.R#L57) and [`parse_fine_figures`](../R/model.R#L58) (both resolve to `step5_figures/`). One PDF per fill mode listed in `parse.fill_modes`: `coarse_operons_<fill_by>.pdf`, `fine_operons_<fill_by>.pdf`, plus per-component variants under `02_by_component_coarse/` and `03_by_component_fine/`.
 
@@ -427,7 +425,16 @@ Detail on each:
 
 The driver also enriches `coarse_summary` with isoform-mapping columns post-hoc - `n_isoforms_raw` (from `fine_summary`), and `n_isoforms_filtered` / `n_coarse_genome_filtered` / `uid_fine_list` (from `selected_fine`, available after stage 2). `coarse_summary$neighbor_genomes` is intentionally not carried - genome-level traceback is a fine-isoform concern.
 
-**2. Selection.** `path_min_genomes <- cfg_get(job_config, "path_min_genomes")` and `ratio <- cfg_get(job_config, "fine_coverage_ratio")`, then `selected_fine <- fine_summary %>% filter(n_fine_genomes >= ceiling(path_min_genomes * ratio))`. The example sets `ratio = 0.25` (permissive); historical default `0.5` reproduces the half-coverage rule (an isoform must have at least half as many supporting genomes as the canonical-path survival threshold). `ceiling` (not `floor`) keeps the bar from dropping below the configured fraction on odd `path_min_genomes`.
+**2. Selection.** The survival gate for everything downstream:
+
+```r
+path_min_genomes <- cfg_get(job_config, "path_min_genomes")
+ratio            <- cfg_get(job_config, "fine_coverage_ratio")
+selected_fine    <- fine_summary %>% filter(n_fine_genomes >= ceiling(path_min_genomes * ratio))
+selected_coarse  <- coarse_summary %>% semi_join(selected_fine, by = "uid")
+```
+
+An isoform survives if it reaches at least `fine_coverage_ratio` as many supporting genomes as the canonical-path threshold (`ratio = 0.25` in the example, permissive; historical default `0.5` reproduces the half-coverage rule). `ceiling` (not `floor`) keeps the bar from dropping below the configured fraction on odd `path_min_genomes`. `selected_coarse` is just the coarse uids whose isoforms survived - everything downstream (Step 5 figures, BLAST lists) is gated by `selected_fine`.
 
 **3. Fine-only sampling.** [`sample_genome_from_fine_paths()`](../R/parse.R#L385). Draws **one** random genome per surviving fine isoform (no adaptive variation by isoform count). `set.seed` is called once (with `seed` from YAML `parse`, default 616) for reproducibility, then `group_by(uid_fine) %>% slice_sample(n = 1)`. The chosen `gene_path_canonical` is exploded by `unnest_longer` to one row per gene; `position_in_path` is recorded; per-gene metadata (`neighbor_c80_coarse`, `neighbor_c80_fine`, `neighbor_contig_id`, `neighbor_gene_start`, `neighbor_gene_end`, `neighbor_gene_strand`, `neighbor_gene_type`, `neighbor_gene_length`) is merged from a deduped `gene_neighbors` lookup (deduped on `neighbor_gene_id` to prevent row explosion at join time).
 
@@ -441,7 +448,7 @@ Coarse-level BLAST hits are produced **post-hoc**, not by this block: aggregate 
 
 ### Step 5 logic - gggenes figures
 
-[`run_step5_figures()`](../R/plot.R#L652) wires four plotters at global and per-component scope: [`plot_coarse_operons()`](../R/plot.R#L404) and [`plot_fine_operons()`](../R/plot.R#L456) (one PDF per `fill_by` mode at the global level), [`plot_coarse_operons_by_component()`](../R/plot.R#L501) and [`plot_fine_operons_by_component()`](../R/plot.R#L556) (one PDF per `(joint_component_id, fill_by)` under `02_by_component_coarse/` and `03_by_component_fine/`, faceted by `updated_path_type`). Each plotter consumes its summary as a `semi_join` filter on `uid` / `uid_fine`. The shared layout helper [`.layout_operon_tracks()`](../R/plot.R#L245) computes per-track positions and a single `fill_symbol` glyph per gene with this precedence (top wins):
+[`run_step5_figures()`](../R/plot.R#L652) wires four plotters at global and per-component scope: [`plot_coarse_operons()`](../R/plot.R#L404) and [`plot_fine_operons()`](../R/plot.R#L456) (one PDF per `fill_by` mode at the global level), [`plot_coarse_operons_by_component()`](../R/plot.R#L501) and [`plot_fine_operons_by_component()`](../R/plot.R#L556) (one PDF per `(joint_component_id, fill_by)` under `02_by_component_coarse/` and `03_by_component_fine/`, faceted by `updated_path_type`). The facet column is set by [`decorate_with_updated_path_type()`](../R/parse.R#L595), which excludes synthetic `_`-prefixed ORFs from the per-path pos/neg/anchor purity vote (same `startsWith(neighbor_c80_coarse, "_")` guard as Step 6); synthetic rows still *inherit* their path's `updated_path_type` via the now-component-matched join, they just don't *change* it. Each plotter consumes its summary as a `semi_join` filter on `uid` / `uid_fine`. The shared layout helper [`.layout_operon_tracks()`](../R/plot.R#L245) computes per-track positions and a single `fill_symbol` glyph per gene with this precedence (top wins):
 
 | Glyph | Condition |
 |---|---|
@@ -470,7 +477,7 @@ The fine plots order tracks so isoforms of the same coarse `uid` are adjacent; t
 - **Two `neighbor_gene_length` semantics, only one in the output.** `gene_neighbors.neighbor_gene_length` is per-gene observed; `c80s_fine.neighbor_gene_length` is per-isoform consensus. The enriched `fine_long` keeps the per-gene version (from the sampler stage); the c80s_fine version is dropped at enrichment time. Don't merge them into one column - they answer different questions.
 ## STEP 6 - Trait-associated block extraction + representative ranking
 
-**Driver section:** [pipeline.R:131-142](../pipeline.R#L131-L142) (one-line orchestrator call to [`run_step6_blocks`](../R/blocks.R#L458))
+**Driver section:** [pipeline.R:131-142](../pipeline.R#L131-L142) (one-line orchestrator call to [`run_step6_blocks`](../R/blocks.R#L463))
 **Helper file:** [blocks.R](../R/blocks.R)
 **Gated by:** `blocks.skip_block` in the YAML (default `false`). Setting `blocks.skip_block: true` short-circuits the block-extraction call in pipeline.R; the block outputs (`representative_path.tsv`, `rep.tsv`) are not written under `step6_blocks/`. Step 4 (parse) and the figure-rendering half of Step 6 do not depend on block-extraction outputs, so they proceed unchanged.
 
@@ -483,7 +490,7 @@ The fine plots order tracks so isoforms of the same coarse `uid` are adjacent; t
 
 - `representatives` (TSV at [`rep_path_df`](../R/model.R#L60)). One row per non-redundant trait-associated block, with `block_uid = "cmp{component}-{path_type}-rank{rep_rank}-nge{block_n_genes}"`, `relation_to_selected` in {`selected`, `subset`, `superpath`, `overlap`, `disjoint`}, and `canonical_paths` / `canonical_uids` provenance lists.
 - `rep_slim` (TSV at [`uid_path_df`](../R/model.R#L61)). Per-genome attribution: one row per `(block_uid, canonical_uid, neighbor_genome, left_orig, right_orig)`, after the `select(...) %>% unique()` projection in the driver.
-- Diagnostic message via [`diagnose_rep_overlaps()`](../R/blocks.R#L265): how many `(component, path_type)` groups have substring-overlap pairs that survived (i.e., reps that share a substring but neither contains the other - the case the subset-only redundancy check can't collapse).
+- Diagnostic message via [`diagnose_rep_overlaps()`](../R/blocks.R#L270): how many `(component, path_type)` groups have substring-overlap pairs that survived (i.e., reps that share a substring but neither contains the other - the case the subset-only redundancy check can't collapse).
 - Optional `rep_heatmap.pdf` (block x genome presence/absence) under the `uid_path_df` directory, only when there are >= 2 reps and the matrix is at least 3x3.
 
 ### Logic
@@ -491,22 +498,22 @@ The fine plots order tracks so isoforms of the same coarse `uid` are adjacent; t
 Five stages, all keyed on `(joint_component_id, path_type)`:
 
 **1. [`keep_focal_blocks()`](../R/blocks.R#L50)** (called inside `aggregate_blocks`)
-Within each `(joint_component_id, canonical_path_id, path_type)` group, walk rows in their existing per-path order. Tag each as a focal hit (`is_focal == TRUE`) or non-hit. Cluster adjacent hits into blocks: a new block starts when more than `allow_gaps` non-hit rows intervene (gap rule: `gaps > allow_gaps + 1`). Drop non-hit rows. Sign (`+` / `-` `is_label`) is recorded but does **not** split blocks - a block can mix signs if they're close enough.
+First drops synthetic `_`-prefixed ORF rows (`startsWith(neighbor_c80_coarse, "_")`) so block geometry is computed over the same rows as before those rows inherited a component in Step 3 - real length-variant backbone genes are kept. Then, within each `(joint_component_id, canonical_path_id, path_type)` group, walk rows in their existing per-path order. Tag each as a focal hit (`is_focal == TRUE`) or non-hit. Cluster adjacent hits into blocks: a new block starts when more than `allow_gaps` non-hit rows intervene (gap rule: `gaps > allow_gaps + 1`). Drop non-hit rows. Sign (`+` / `-` `is_label`) is recorded but does **not** split blocks - a block can mix signs if they're close enough.
 
-**2. [`aggregate_blocks()`](../R/blocks.R#L96)**
-For each block, dedup consecutive duplicate c80 tokens (`A A B B C -> A B C` via [`dedup_consecutive_vec`](../R/blocks.R#L382)) and emit `block_c80s_path` (`->`-joined), `n_genes`, `left_orig` / `right_orig` endpoints, `edge_pair`, and the singleton flag. Then aggregate at `(joint_component_id, path_type, edge_pair, block_c80s_path)`: `block_n_paths` = number of canonical paths supporting this block shape, `block_n_genomes` = sum of `n_genomes` across them, and parallel `canonical_paths` / `canonical_uids` lists. Per-component frequency: `block_freq = block_n_genomes / block_total`.
+**2. [`aggregate_blocks()`](../R/blocks.R#L101)**
+For each block, dedup consecutive duplicate c80 tokens (`A A B B C -> A B C` via [`dedup_consecutive_vec`](../R/blocks.R#L387)) and emit `block_c80s_path` (`->`-joined), `n_genes`, `left_orig` / `right_orig` endpoints, `edge_pair`, and the singleton flag. Then aggregate at `(joint_component_id, path_type, edge_pair, block_c80s_path)`: `block_n_paths` = number of canonical paths supporting this block shape, `block_n_genomes` = sum of `n_genomes` across them, and parallel `canonical_paths` / `canonical_uids` lists. Per-component frequency: `block_freq = block_n_genomes / block_total`.
 
-**3. Reference selection** - first half of [`rank_block_representatives()`](../R/blocks.R#L168)
+**3. Reference selection** - first half of [`rank_block_representatives()`](../R/blocks.R#L173)
 Per `(joint_component_id, path_type)`, sort by `desc(block_freq), desc(block_n_genomes), desc(block_n_genes), desc(block_n_paths), block_c80s_path` (tie-break for determinism) and take the top row as the dominant block. Stored as `selected_tbl`.
 
-**4. [`annotate_group()`](../R/blocks.R#L325)** (called per group via `group_modify`)
-Tag every block with its [`get_relation()`](../R/blocks.R#L417) to the selected block: `selected | subset | superpath | overlap | disjoint`. Then run the greedy rep-construction loop:
+**4. [`annotate_group()`](../R/blocks.R#L330)** (called per group via `group_modify`)
+Tag every block with its [`get_relation()`](../R/blocks.R#L422) to the selected block: `selected | subset | superpath | overlap | disjoint`. Then run the greedy rep-construction loop:
 
 - Sort the group by `desc(block_n_genes), desc(block_n_genomes), desc(block_n_paths), block_c80s_path` (longest first).
 - Install the selected reference as `rep_rank = 1`.
 - For each remaining row: if its `block_c80s_path` is a contiguous subset (forward direction only - see caveat) of any already-installed rep, mark redundant (`rep_rank = 0`, `is_redundant = TRUE`). Otherwise, install it as a new rep with the next integer rank.
 
-**5. [`map_representatives_to_genomes()`](../R/blocks.R#L224)**
+**5. [`map_representatives_to_genomes()`](../R/blocks.R#L229)**
 Use the shared backbone [`explode_canonical_into_collapsed_paths()`](../R/path.R#L70) to walk each rep's contributing canonical paths back to the per-genome paths that carry them. `separate_rows` explodes the parallel `canonical_paths` / `canonical_uids` lists together so each exploded row pairs one canonical with its `uid`. **Sanity check:** `stopifnot(path_type == path_type_per_genome)` - block path_type must match per-genome type for every row.
 
 The driver writes `representatives` and the `rep_slim` projection (`block_uid, canonical_uid, neighbor_genome, left_orig, right_orig`), then runs the diagnostic and optional heatmap.
@@ -521,7 +528,7 @@ From `blocks`:
 
 ### Known caveats
 
-- **Redundancy is subset-only, forward-direction.** [`is_contig_subseq()`](../R/blocks.R#L388) does not test the reverse of `p`. A block and its exact mirror survive as two separate reps. A reverse-aware variant (`is_contig_subseq(rev(p), r)`) is documented in `annotate_group` but not wired in.
+- **Redundancy is subset-only, forward-direction.** [`is_contig_subseq()`](../R/blocks.R#L393) does not test the reverse of `p`. A block and its exact mirror survive as two separate reps. A reverse-aware variant (`is_contig_subseq(rev(p), r)`) is documented in `annotate_group` but not wired in.
 - **Substring-overlap pairs survive.** The diagnostic `diagnose_rep_overlaps` exists precisely because reps that share a contiguous substring but neither contains the other can't be collapsed by the subset-only check, and may double-count genomes downstream.
 - **Block-level `block_uid` collides with no other `uid`** because of the `cmp...-rank...-nge...` prefix; do not confuse with the canonical-level `uid` from Step 3 or the isoform-level `uid_fine`.
 

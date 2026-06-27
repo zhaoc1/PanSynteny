@@ -554,7 +554,7 @@ pangenome-operons-v2/
 
 These are documented here so you don't trip on them.
 
-1. **Mirror-block reps survive in Step 6.** [`is_contig_subseq`](../R/blocks.R#L388) is forward-direction only; a block and its exact reverse end up as two separate reps. The diagnostic in `diagnose_rep_overlaps` will catch this if it happens.
+1. **Mirror-block reps survive in Step 6.** [`is_contig_subseq`](../R/blocks.R#L393) is forward-direction only; a block and its exact reverse end up as two separate reps. The diagnostic in `diagnose_rep_overlaps` will catch this if it happens.
 2. **Step 1 orientation is not preserved into Steps 2/3.** Step 2 re-derives chromosomal order; Step 3 canonicalizes lexicographically (with synthetic small-ORF tokens stripped from the decision; see `clean_for_orientation` in `graph.R`). Within-component direction consistency is the strongest guarantee you get on the output side.
 3. **Off-species c80s have NA c80 metadata.** ECOR genes can map to centroid_80s from any species. Their `neighbor_c80_length_coarse` / `genome_prevalence` come through as NA after the `load_c80_tables` join; downstream NA-tolerant.
 
